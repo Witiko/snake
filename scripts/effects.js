@@ -5,7 +5,7 @@ if(CSSFilters && !(CSSTransform && CSSOpacity)) {
   setGlow = function(element, strength, color) {
     var filter = element.style.filter.length === 0?
       false:element.filters["DXImageTransform.Microsoft.Glow"];
-    if(typeof filter === "object")
+    if(filter)
       element.style.filter = element.style.filter.replace(
         /(progid:DXImageTransform\.Microsoft\.Glow\(color=).*(,strength=)\d*(\))/,
         strength > 0?"$1" + color + "$2" + strength + "$3":""
@@ -23,7 +23,7 @@ if(CSSFilters && !(CSSTransform && CSSOpacity)) {
     angle = angle.degToRad().radAdjust();
     sin = angle.sin();
     cos = angle.cos();
-    if(typeof filter === "object") {
+    if(filter) {
       /* Spoèítáme si hodnoty transformace a zaneseme nové hodnoty */
       element.style.filter = element.style.filter.replace(
         /(progid:DXImageTransform\.Microsoft\.Matrix\(M11=)-?.*(,M12=)-?.*(,M21=)-?.*(,M22=)-?.*(,sizingMethod='auto expand'\))/,
@@ -39,21 +39,23 @@ if(CSSFilters && !(CSSTransform && CSSOpacity)) {
     }
   };
 
-  setOpacity = function(element, opacity) {
+  setOpacity = function(element, opacity, dontChangeVisibility) {
     var filter = element.style.filter.length === 0?
           false:element.filters["DXImageTransform.Microsoft.Alpha"];
-    opacity = opacity.round();
-    if(opacity > 0 && element.style.visibility == "hidden")
-       element.style.visibility = "visible";
-    if(typeof filter === "object") {
-      element.style.filter = element.style.filter.replace(
+    opacity = (+opacity).round();
+    if(filter) element.style.filter = element.style.filter.replace(
         /(progid:DXImageTransform\.Microsoft\.Alpha\(opacity=)\d*(\.\d*)?(\))/,
-        opacity !== 0 && opacity !== 100?"$1" + opacity + "$3":""
+        (dontChangeVisibility || opacity !== 0) && opacity !== 100?"$1" + opacity + "$3":""
       );
-    } else if(opacity !== 0 && opacity !== 100)
+    else if((dontChangeVisibility || opacity !== 0) && opacity !== 100)
       element.style.filter += "progid:DXImageTransform.Microsoft.Alpha(opacity=" + opacity + ")";
-    if(     opacity === 0   && !covered(element))   cover(element);
-    else if(opacity === 100 &&  covered(element)) uncover(element);
+    if(!dontChangeVisibility) {
+      if(opacity) {
+        if( covered(element)) uncover(element);
+      } else {
+        if(!covered(element))   cover(element);
+      }
+    }
   };
 
   getOpacity = function(element) {
@@ -84,15 +86,16 @@ if(CSSFilters && !(CSSTransform && CSSOpacity)) {
     else element.style.textShadow = "";
   };
 
-  setOpacity = function(element, opacity) {
-    if(opacity > 0) {
-      if(element.style.visibility == "hidden")
-        element.style.visibility = "visible";
+  setOpacity = function(element, opacity, dontChangeVisibility) {
+    if(dontChangeVisibility || opacity)
       element.style.opacity = opacity === 100?"":opacity / 100;
-    } else {
-      element.style.visibility = "hidden";
-      if(element.style.opacity)
+    if(!dontChangeVisibility) {
+      if(opacity) {
+        if( covered(element)) uncover(element);
+      } else {
+        if(!covered(element)) cover(element);
         element.style.opacity = "";
+      }
     }
   };
 
@@ -135,30 +138,3 @@ var hidden = function(element) {
 var covered = function(element) {
   return element.style.visibility === "hidden";
 };
-
-/*var Transition = CSSTransition === true?function(element, opts) {
-  var i;
-  if("StartValue" in opts) {
-    if(opts.JSProperties instanceof Array)
-      opts.JSProperties.each(function(property) {
-        element.style[property] = opts.StartValue;
-      });
-    else element.style[opts.JSProperties] = opts.StartValue;
-  }
-  // Property, Duration, TimingFunction, Delay, Value, StartValue, JSProperties
-  for(i in opts) {
-    if(i === "Value" ||
-       i === "StartValue" ||
-       i === "JSProperties")
-         continue;
-    element.style["transition" + i] = opts[i];
-    element.style["OTransition" + i] = opts[i];
-    element.style["MozTransition" + i] = opts[i];
-    element.style["WebkitTransition" + i] = opts[i];
-  }
-  if(opts.JSProperties instanceof Array)
-    opts.JSProperties.each(function(property) {
-      element.style[property] = opts.Value;
-    });
-  else element.style[opts.JSProperties] = opts.Value;
-}:false;*/

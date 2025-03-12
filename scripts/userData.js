@@ -44,7 +44,7 @@ var userData = ((document.documentElement || document.getElementsByTagName("html
     },
     load : (function() {
       list = userDataElement.getAttribute("list");
-      if(typeof list !== "string") {
+      if(!(String.isString(list))) {
         list = [];
       } else {
         list = list.split(";");

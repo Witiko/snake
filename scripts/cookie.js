@@ -22,7 +22,7 @@ var cookie = (navigator.cookieEnabled && (function(){
   document.cookie = text + "=" + text + ";expires=" + expired + ";domain=" + location.hostname + ";path=/";
   return returnValue;
 })())?(function() {
-  var text = new Date().getTime(),
+  var text = Date.now?Date.now():new Date().getTime(),
       current = new Date(),
       expired = new Date(),
       loaded = {}, length = 0;

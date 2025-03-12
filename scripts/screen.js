@@ -122,7 +122,7 @@ var Screen = (function() {
             if(Screen.onresize instanceof Function) newThread(function(){
               Screen.onresize(formerSizeValues, !invokedByUser);
             });
-            resizeQueue.each(function(field) {
+            resizeQueue.forEach(function(field) {
               newThread(function() {
                 field(formerSizeValues, !invokedByUser);
               });
@@ -132,7 +132,7 @@ var Screen = (function() {
             if(Screen.onscroll instanceof Function) newThread(function(){
               Screen.onscroll(formerScrolledContent, !invokedByUser);
             });
-            scrollQueue.each(function(field) {
+            scrollQueue.forEach(function(field) {
               newThread(function() {
                 field(formerScrolledContent, !invokedByUser);
               });
@@ -148,7 +148,7 @@ var Screen = (function() {
           if(Screen.onscroll instanceof Function) newThread(function(){
             Screen.onscroll(formerScrolledContent, false);
           });
-          scrollQueue.each(function(field) {
+          scrollQueue.forEach(function(field) {
             newThread(function() {
               field(formerScrolledContent, false);
             });
@@ -161,7 +161,7 @@ var Screen = (function() {
           Screen.onload();
           delete Screen.onload;
         }
-        loadQueue.each(function(func) {
+        loadQueue.forEach(function(func) {
           newThread(func);
         });
       }, that;
@@ -191,7 +191,7 @@ var Screen = (function() {
       }})(),
       success = false;
       if(!array) return false;
-      array.each(function(field, index) {
+      array.forEach(function(field, index) {
         if(field === listener) {
           array.remove(index);
           success = true;
@@ -216,7 +216,7 @@ var Screen = (function() {
       }})(),
       success = false;
       if(!array) return false;
-      array.each(function(field, index) {
+      array.forEach(function(field, index) {
         if(field === listener) {
           array.remove(index);
           success = true;

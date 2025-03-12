@@ -31,7 +31,7 @@ function GUI(settings) {
 
   // Modules init
   if(!this.constructor.instances.length) {
-    this.constructor.modules.each(function(module) {
+    this.constructor.modules.forEach(function(module) {
       if(module.enabled)
          module.init(module.data);
     });
@@ -50,11 +50,11 @@ GUI.instances = [];     // Instances
 GUI.updateColors = function() {
   if(!this.instances.length) return;
   var args = arguments;
-  this.modules.each(function(module) {
+  this.modules.forEach(function(module) {
     if(module.enabled && module.static && module.static.updateColors)
        module.static.updateColors.call(GUI, module.data, args);
   });
-  this.instances.each(function(GUInst) {
+  this.instances.forEach(function(GUInst) {
     GUInst.updateColors(args);
   });
 };
@@ -67,11 +67,11 @@ GUI.show = function(callback, additionalAttributes) {
           callback instanceof Function)
           callback();
       };
-  this.modules.each(function(module) {
+  this.modules.forEach(function(module) {
     if(module.enabled && module.static && module.static.show)
        module.static.show.call(GUI, module.data, additionalAttributes);
   });
-  this.instances.each(function(GUInst) {
+  this.instances.forEach(function(GUInst) {
     if(GUInst.status !== GUI.VISIBLE) {
       length++;
       GUInst.show(listen, additionalAttributes);
@@ -87,11 +87,11 @@ GUI.hide = function(callback, additionalAttributes) {
           callback instanceof Function)
           callback();
       };
-  this.modules.each(function(module) {
+  this.modules.forEach(function(module) {
     if(module.enabled && module.static && module.static.hide)
        module.static.hide.call(GUI, module.data, additionalAttributes);
   });
-  this.instances.each(function(GUInst) {
+  this.instances.forEach(function(GUInst) {
     if(GUInst.status !== GUI.HIDDEN) {
       length++;
       GUInst.hide(listen, additionalAttributes);
@@ -109,7 +109,7 @@ GUI.prototype.updateColors = function(args) {
        args,
        this._private.data
     );
-  GUI.modules.each(function(module) {
+  GUI.modules.forEach(function(module) {
     if(module.enabled && module.prototypal && module.prototypal.updateColors)
        module.prototypal.updateColors.call(
          that,
@@ -133,7 +133,7 @@ GUI.prototype.show = function(callback, additionalAttributes) {
       additionalAttributes,
       this._private.data
     );
-  GUI.modules.each(function(module) {
+  GUI.modules.forEach(function(module) {
     if(module.enabled && module.prototypal && module.prototypal.show)
        module.prototypal.show.call(
          that,
@@ -143,8 +143,7 @@ GUI.prototype.show = function(callback, additionalAttributes) {
          that._private.data
        );
   });
-  if(startOpacity === 0)
-    canvas.appendChild($.wrapper);
+  if(startOpacity === 0) canvas.appendChild($.wrapper);
   if($.animation) $.animation();
   this.status = GUI.APPEARING;
   $.wrapper.style.left = String(Screen.clientDimensions[0] / 2 - $.wrapper.offsetWidth / 2) + "px";
@@ -185,7 +184,7 @@ GUI.prototype.hide = function(callback, additionalAttributes) {
       additionalAttributes,
       this._private.data
     );
-  GUI.modules.each(function(module) {
+  GUI.modules.forEach(function(module) {
     if(module.enabled && module.prototypal && module.prototypal.hide)
        module.prototypal.hide.call(
          that,
@@ -294,24 +293,23 @@ GUI.modules = [
     enabled: CSSFilters || CSSOpacity,
     data: {
       veil: document.createElement("div"),
-      veilOpacity: 40,
       status: GUI.HIDDEN,
       show: function($) {
         if($.status === GUI.VISIBLE) return;
         if(!Graphics.Transparency || !Graphics.Veil || !Graphics.VeilAnimation) {
           $.status = GUI.VISIBLE;
           if(Graphics.Transparency && Graphics.Veil && !Graphics.VeilAnimation)
-            setOpacity($.veil, $.veilOpacity);
+            setOpacity($.veil, veilOpacity);
           return;
         }
         var startOpacity = $.status === GUI.HIDDEN?
               0:getOpacity($.veil),
-            delay = GUI.showingDelay * (1 - startOpacity / $.veilOpacity);
+            delay = GUI.showingDelay * (1 - startOpacity / veilOpacity);
         if($.status === GUI.HIDDEN)
           canvas.appendChild($.veil);
         if($.anim) $.anim();
         $.status = GUI.APPEARING;
-        $.anim = retransparent($.veil, delay, startOpacity, $.veilOpacity, function() {
+        $.anim = retransparent($.veil, delay, startOpacity, veilOpacity, function() {
           delete $.anim;
           $.status = GUI.VISIBLE;
         });
@@ -325,8 +323,8 @@ GUI.modules = [
           return;
         }
         var startOpacity = $.status === GUI.VISIBLE?
-              $.veilOpacity:getOpacity($.veil),
-            delay = GUI.showingDelay * startOpacity / $.veilOpacity;
+              veilOpacity:getOpacity($.veil),
+            delay = GUI.showingDelay * startOpacity / veilOpacity;
         if($.anim) $.anim();
         $.status = GUI.HIDING;
         $.anim = retransparent($.veil, delay, startOpacity, 0, function() {
@@ -340,7 +338,7 @@ GUI.modules = [
       $.veil.className = "veil";
       $.veil.style.backgroundColor = veilColor;
       if(Graphics.Transparency && Graphics.Veil) {
-        setOpacity($.veil, $.veilOpacity);
+        setOpacity($.veil, veilOpacity);
         canvas.appendChild($.veil);
         $.status = GUI.VISIBLE;
       } else {
@@ -363,12 +361,12 @@ GUI.modules = [
               cover($.veil); // Hide the element
               canvas.removeChild($.veil); // And remove it from the document
             } else if(covered($.veil)) { // If the graphics were re-renabled
-              setOpacity($.veil, $.veilOpacity); // Make the veil visible
+              setOpacity($.veil, veilOpacity); // Make the veil visible
               canvas.appendChild($.veil); // And append it into the document
             } else if(!Graphics.VeilAnimation) { // If the veil animation was disabled
               if($.anim) $.anim(); // Kill the animation
               if($.status !== GUI.VISIBLE) // And if necessary, set the correct opacity
-                setOpacity($.veil, $.veilOpacity);
+                setOpacity($.veil, veilOpacity);
             }
           } else if(Graphics.Transparency && Graphics.Veil) // Else if the graphics were throttled
             cover($.veil); // Make the hidden element invisible
@@ -384,7 +382,7 @@ GUI.modules = [
     prototypal: {
       show: function($) {
         var length = GUI.instances.length;
-        GUI.instances.each(function(GUInst) {
+        GUI.instances.forEach(function(GUInst) {
           if(GUInst.status === GUI.HIDDEN ||
              GUInst.status === GUI.HIDING) length--;
         });
@@ -392,7 +390,7 @@ GUI.modules = [
       },
       hide: function($) {
         var length = GUI.instances.length;
-        GUI.instances.each(function(GUInst) {
+        GUI.instances.forEach(function(GUInst) {
           if(GUInst.status === GUI.HIDDEN ||
              GUInst.status === GUI.HIDING) length--;
         });

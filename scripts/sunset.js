@@ -31,7 +31,7 @@ var DayTime = (function() {
       var Event = that.closestEvent();
       if (Event !== false)
         setTimeout(function() {
-          that._private.listeners.each(function(listener) {
+          that._private.listeners.forEach(function(listener) {
             listener(Event[0]);
           });
           switch(Event[0]) {

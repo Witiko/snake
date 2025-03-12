@@ -5,7 +5,7 @@ function rotate(object,time,startDeg,finalDeg,callback) {
   var diff = delta / ticks;
   for(var index = 0; index <= ticks; index++) {
     (function(index){
-        calls.push(window.setTimeout(function(){
+        calls.push(setTimeout(function(){
             var result = index===ticks?finalDeg:startDeg+diff*index;
             setAngle(object, result);
             if(index === ticks && callback instanceof Function) callback();
@@ -13,7 +13,7 @@ function rotate(object,time,startDeg,finalDeg,callback) {
     })(index);
   }
   return function() {
-    calls.each(function(call) {
+    calls.forEach(function(call) {
       clearTimeout(call);
     });
   }
@@ -31,7 +31,7 @@ function move(object,time,x,y,x2,y2,regardWindow,callback) {
   for(var index = 0; index <= ticks; index++) {
     if(previous[0] !== (index === ticks?x2:Math.round(x+diff[0]*index))
     || previous[1] !== (index === ticks?y2:Math.round(y+diff[1]*index))) (function(index){
-        calls.push(window.setTimeout(function(){
+        calls.push(setTimeout(function(){
             if(index === ticks) {
               previous = [x2,y2];
             } else {
@@ -55,7 +55,7 @@ function move(object,time,x,y,x2,y2,regardWindow,callback) {
     })(index);
   }
   return function() {
-    calls.each(function(call) {
+    calls.forEach(function(call) {
       clearTimeout(call);
     });
   }
@@ -73,7 +73,7 @@ function textMove(object, time, x, y, x2, y2, shadow, regardWindow, callback) {
   for(var index = 0; index <= ticks; index++) {
     if(previous[0] !== (index === ticks?x2:Math.round(x+diff[0]*index))
     || previous[1] !== (index === ticks?y2:Math.round(y+diff[1]*index))) (function(index){
-        calls.push(window.setTimeout(function(){
+        calls.push(setTimeout(function(){
             if(index === ticks) {
               previous = [x2,y2];
             } else {
@@ -97,7 +97,7 @@ function textMove(object, time, x, y, x2, y2, shadow, regardWindow, callback) {
     })(index);
   }
   return function() {
-    calls.each(function(call) {
+    calls.forEach(function(call) {
       clearTimeout(call);
     });
   }
@@ -115,7 +115,7 @@ function textResize(object,time,oldsize,newsize,partialCallback,callback) {
   var previous = false;
   for(var index = 0; index <= ticks; index++) {
   if(previous !== (index === ticks?newsize:Math.round(oldsize+diff*index))) (function(index){
-          calls.push(window.setTimeout(function(){
+          calls.push(setTimeout(function(){
               previous = index === ticks?newsize:Math.round(oldsize+diff*index);
               var left = object.style.position==="absolute"?Number(object.style.left.replace("px","")):0;
               var top = object.style.position==="absolute"?Number(object.style.top.replace("px","")):0;
@@ -138,7 +138,7 @@ function textResize(object,time,oldsize,newsize,partialCallback,callback) {
       })(index);
   }
   return function() {
-    calls.each(function(call) {
+    calls.forEach(function(call) {
       clearTimeout(call);
     });
   }
@@ -153,16 +153,16 @@ function recolor(time,oldcolor,newcolor,partialCallback,callback) {
         previous;
     for(var index = 1; index <= ticks; index++) {
     if(previous !== (previous = transition.calc(index / ticks))) (function(index, color){
-            calls.push(window.setTimeout(function() {
+            calls.push(setTimeout(function() {
                 if(partialCallback instanceof Function) partialCallback(color);
                 if(index === ticks && callback instanceof Function) callback();
             }, index * (1000 / Graphics.FramesPerSecond)));
         })(index, previous);
     else if(ticks === index && callback instanceof Function)
-      calls.push(window.setTimeout(callback, index*(1000 / Graphics.FramesPerSecond)));
+      calls.push(setTimeout(callback, index*(1000 / Graphics.FramesPerSecond)));
     }
     return function() {
-      calls.each(function(call) {
+      calls.forEach(function(call) {
         clearTimeout(call);
       });
     }
@@ -190,7 +190,7 @@ function resize(object,time,oldwidth,oldheight,newwidth,newheight,regardWindow,c
   for(var index = 0; index <= ticks; index++) {
   if(previous[0] !== (index === ticks?newwidth:Math.round(oldwidth+diff[0]*index))
   || previous[1] !== (index === ticks?newheight:Math.round(oldheight+diff[1]*index))) (function(index){
-          calls.push(window.setTimeout(function(){
+          calls.push(setTimeout(function(){
               previous = [(index === ticks?newwidth:Math.round(oldwidth+diff[0]*index)),(index === ticks?newheight:Math.round(oldheight+diff[1]*index))];
               object.style.width = String(previous[0]) + "px";
               object.style.height = String(previous[1]) + "px";
@@ -199,7 +199,7 @@ function resize(object,time,oldwidth,oldheight,newwidth,newheight,regardWindow,c
       })(index);
   }
   return function() {
-    calls.each(function(call) {
+    calls.forEach(function(call) {
       clearTimeout(call);
     });
   }
@@ -208,7 +208,7 @@ function resize(object,time,oldwidth,oldheight,newwidth,newheight,regardWindow,c
 // ----------------------------------------------
 
 function size(object,width,height,regardWindowWidth, regardWindowHeight) {
-  if(typeof object !== "object") object = document.getElementById(object);
+  if(!(object instanceof Object)) object = document.getElementById(object);
   if(!object) if(callback instanceof Function) callback();
   if(regardWindowWidth && width > Body.clientWidth) {
       height = Math.round(((Body.clientWidth) / width) * height);
@@ -224,7 +224,7 @@ function size(object,width,height,regardWindowWidth, regardWindowHeight) {
 
 // ----------------------------------------------
 
-function retransparent(object,time,transparency_start,transparency_end,callback) {
+function retransparent(object,time,transparency_start,transparency_end,callback,dontChangeVisibility) {
   var calls = [];
   var ticks = Math.round(time / (1000 / Graphics.FramesPerSecond));
   var delta = transparency_end - transparency_start;
@@ -233,16 +233,11 @@ function retransparent(object,time,transparency_start,transparency_end,callback)
   for(var index = 0; index <= ticks; index++) {
     if(Math.floor(transparency_start+(index*diff)) !== previous || index === ticks) {
       (function(index){
-        calls.push(window.setTimeout(function() {
+        calls.push(setTimeout(function() {
           var opacity;
           if(index === ticks) opacity = transparency_end;
           else opacity = transparency_start+(index*diff);
-          if(opacity > 0) {
-            setOpacity(object, opacity);
-          } else {
-            setOpacity(object, 100);
-            cover(object);
-          }
+          setOpacity(object, opacity, dontChangeVisibility);
           if(index === ticks && callback instanceof Function) callback();
         },index*(1000 / Graphics.FramesPerSecond)));
       })(index);
@@ -250,7 +245,7 @@ function retransparent(object,time,transparency_start,transparency_end,callback)
     }
   }
   return function() {
-    calls.each(function(call) {
+    calls.forEach(function(call) {
       clearTimeout(call);
     });
   }

@@ -10,7 +10,7 @@ var TRANSIT = 0,      // Wall collision flags
 function Snake(field, opts) {
   if(this === window ||
      !(field instanceof gameField) ||
-     typeof opts != "object" ||
+     !(opts instanceof Object) ||
      opts.head === undefined ||
      opts.body === undefined ||
      opts.length <= 0 ||
@@ -23,7 +23,7 @@ function Snake(field, opts) {
   this.body = opts.body;
   this.length = opts.length;
   this.AI = opts.automation;
-  this.callbacks = typeof opts.callbacks === "object"?opts.callbacks:{};
+  this.callbacks = opts.callbacks instanceof Object?opts.callbacks:{};
   if(this.AI.movement.lifeTimeManager instanceof lifeTimeManager || this.AI.drawStars) {
     var formerDeathCallback = this.callbacks.death;
     this.callbacks.death = function() {
@@ -35,7 +35,7 @@ function Snake(field, opts) {
   }
   else
     this.callbacks = {};
-  if(typeof opts.collision === "object")
+  if(opts.collision instanceof Object)
     this.collision = opts.collision;
   this.position = opts.position;
   this.direction = opts.direction;
@@ -83,7 +83,7 @@ function Snake(field, opts) {
 }
 
 Snake.cleanCache = function() {
-  this.instances.each(function(instance) {
+  this.instances.forEach(function(instance) {
     instance._.findPathCache.empty.call(instance._.findPathCache);
   });
 }
@@ -243,7 +243,7 @@ Snake.prototype.move = function(callback) {
         )) field.remove(this.history[this.history.length - 1][0], this.history[this.history.length - 1][1]);
         // Refreshing the lifeTimeManager values
         if(increaseSize === true && this.AI.movement.lifeTimeManager.get(this.history[0], this.history[1]) !== this.length - 1) {
-          this.history.each(function(position, index) {
+          this.history.forEach(function(position, index) {
             that.AI.movement.lifeTimeManager.set(position[0], position[1],
                                                  that.length - index - 1);
           });
@@ -465,7 +465,7 @@ Snake.prototype.find = function(destination) {
     destination = true;
   var depth = 0,
       cache = this._.findPathCache,
-      accessSearch = typeof destination === "boolean",
+      accessSearch = Boolean.isBoolean(destination),
       array = cache.status === EMPTY?(cache.array = this.AI.movement.lifeTimeManager.getArray()):cache.array,
       arrayLength = cache.arrayLength,
       arrayLengthPending = cache.arrayLengthPending,
@@ -484,7 +484,7 @@ Snake.prototype.find = function(destination) {
               (queue[0][0] in arrayLength && queue[0][1] in arrayLength[queue[0][0]]?arrayLength[queue[0][0]][queue[0][1]]:originalLength)
             - (newPosition[0] in arrayLength && newPosition[1] in arrayLength[newPosition[0]]?arrayLength[newPosition[0]][newPosition[1]]:originalLength)
             ) + (
-              arrayLengthPending[queue[0][0]] instanceof Array === true && typeof arrayLengthPending[queue[0][0]][queue[0][1]] === "number"?(
+              arrayLengthPending[queue[0][0]] instanceof Array === true && Number.isNumber(arrayLengthPending[queue[0][0]][queue[0][1]])?(
                 arrayLengthPending[queue[0][0]][queue[0][1]] > 0?1:0
               ):0
             ) && array[newPosition[0]][newPosition[1]] <= originalLength))) {
@@ -502,7 +502,7 @@ Snake.prototype.find = function(destination) {
       }, move = function(currPos, destination) {
         var bonus = foodBonuses[field.get(destination[0], destination[1])],
             pending = arrayLengthPending[currPos[0]] instanceof Array &&
-                      typeof arrayLengthPending[currPos[0]][currPos[1]] == "number"?
+                      Number.isNumber(arrayLengthPending[currPos[0]][currPos[1]])?
                         arrayLengthPending[currPos[0]][currPos[1]]:0;
         if(bonus !== undefined) {
           if(arrayLengthChanges[destination[0]] instanceof Array === false)
@@ -536,7 +536,7 @@ Snake.prototype.find = function(destination) {
              (temp[3] instanceof Array && temp[3][0] === destination[0] && temp[3][1] === destination[1]))) {
             move(currPos, destination); break;
           }
-          temp.each(function(a){
+          temp.forEach(function(a){
             if(a !== false) {
               move(currPos, a);
               queue.push(a);
@@ -583,8 +583,8 @@ Snake.prototype.find = function(destination) {
         }
         result[0] = from;
         result[1] = destination;
-        result.each(function(a) {
-          if(arrayLengthChanges[a[0]] instanceof Array && typeof arrayLengthChanges[a[0]][a[1]] === "number")
+        result.forEach(function(a) {
+          if(arrayLengthChanges[a[0]] instanceof Array && Number.isNumber(arrayLengthChanges[a[0]][a[1]]))
             a[2] = arrayLengthChanges[a[0]][a[1]];
         });
         temp.length = 0;
@@ -609,10 +609,10 @@ Snake.prototype.find = function(destination) {
                                                                                                    && array[result[0][0]][result[0][1]] <= ((temp[1] instanceof Array?array[temp[1][0]][temp[1][1]]:-Infinity) > originalLength?array[temp[1][0]][temp[1][1]]:Infinity)
                                                                                                    && array[result[0][0]][result[0][1]] <= ((temp[2] instanceof Array?array[temp[2][0]][temp[2][1]]:-Infinity) > originalLength?array[temp[2][0]][temp[2][1]]:Infinity)))
                break;
-            temp.each(function(a, index) {
+            temp.forEach(function(a, index) {
               if(a !== false && array[a[0]][a[1]] === array[result[0][0]][result[0][1]] - 1) {
                 if(arrayLengthChanges[a[0]] instanceof Array &&
-                   typeof arrayLengthChanges[a[0]][a[1]] === "number") {
+                   Number.isNumber(arrayLengthChanges[a[0]][a[1]])) {
                   a[2] = arrayLengthChanges[a[0]][a[1]][1];
                 }
                 result.unshift(a); return false;
@@ -639,8 +639,8 @@ Snake.prototype.find = function(destination) {
 
   if(queue.length === 0) {  // Either path not found / the cache is already full or we're not looking for a path, but for all accessible places
     if(accessSearch === true) {
-      array.each(function(column, x) {
-        column.each(function(cell, y) {
+      array.forEach(function(column, x) {
+        column.forEach(function(cell, y) {
           if(((destination && cell  >  0)  ||
              (!destination && cell === 0)) && field.get(x, y) === false)
             result.push([x, y, destination?
@@ -668,8 +668,10 @@ Snake.prototype.follow = function(passedPath) {
 
 Snake.prototype.getPoint = function() {
   var point, that = this;
-  this.AI.movement.pursue.point.each(function(f){
-    if((point = f.call(that)) instanceof Array) return false;
+  this.AI.movement.pursue.point.forEach(function(f){
+    if(!point) {
+        point = f.call(that);
+    }
   });
   return point;
 };

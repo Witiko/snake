@@ -1,6 +1,5 @@
 var Buffer = (function() {
-  var that;
-  return (that = {
+  var that; return (that = {
     _private: {
       snake: undefined,
       buffered: [],

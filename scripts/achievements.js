@@ -11,11 +11,12 @@ Achievement
     if .repeat === true, it increases its value by one on every callback function call
     if .repeat === false, it will serve as a private object you can use to manually count in the condition function to decide when
       the callback function will be called.
+  countTill - Number - Optional attribute relevant in (count && repeat) setting. Sets the ceiling to the execution counter.
   repeat - Boolean - if enabled, callback can be called countless times, otherwise it will fire only once
   allowedKeyWords - an Array of keyWords values / a keyWord value based on which will be determined whether or not the condition function will be called, false = all keyWords allowed
   allowedKeyWordTypes - an Array of keyWords types / a keyWord type based on which will be determined whether or not the condition function will be called, false = all keyWord types allowed
   condition(keyWord[, Number count[, Function changeCountValue(Number NewValue)]]) - this function has to return true / false. If it returns true, the callback function is called. If undefined, the callback function is called.
-  callback(keyWord[, Number count[, Function changeCountValue(Number NewValue)]]) - this function is called when the conditions set by the condition function are met
+  callback(keyWord[, Number count[, Function changeCountValue(Number NewValue)]]) - this function is called when the conditions set by the condition function are met.
 
 */
 
@@ -26,14 +27,15 @@ function Achievements() {
       var callback = object.callback;
       var count = 0;
       object.callback = function(keyWord) {
-        if(object.repeat === 1) count++;
-        callback(keyWord, count, function(value){
+        callback(keyWord, count, function(value) {
           count = value;
         });
+        if(object.repeat &&
+          (object.countTill || Infinity) > count) count++;
       }
       var condition = object.condition;
       object.condition = function(keyWord) {
-        return condition(keyWord, count, function(value){
+        return condition(keyWord, count, function(value) {
           count = value;
         });
       }
@@ -41,33 +43,19 @@ function Achievements() {
     array.push(object);
   }
   this.attach = function(achievement) {
-    if(typeof achievement!== "object") return;
-    var object;
-    if(achievement.length) {
-      for(var counter = 0; counter < achievement.length; counter ++) {
-        if(achievement[counter].count !== null && achievement[counter].repeat !== null && achievement[counter].callback) {
-          object = {
-            count: achievement[counter].count,
-            repeat: achievement[counter].repeat,
-            allowedKeyWords: achievement[counter].allowedKeyWords,
-            allowedKeyWordTypes: achievement[counter].allowedKeyWordTypes,
-            condition: achievement[counter].condition,
-            callback: achievement[counter].callback
-          };
-          prepare(object);
-        }
-      }
-    } else {
-      if(achievement.count === null || achievement.repeat === null || !achievement.callback) return;
-      object = {
-        count: achievement[counter].count,
-        repeat: achievement[counter].repeat,
-        allowedKeyWords: achievement[counter].allowedKeyWords,
-        allowedKeyWordTypes: achievement[counter].allowedKeyWordTypes,
-        condition: achievement[counter].condition,
-        callback: achievement[counter].callback
-      };
-      prepare(object);
+    if(!(achievement instanceof Object)) return;
+    if(achievement.length) achievement.forEach(preparation);
+    else preparation(achievement);
+    function preparation(achievement) {
+      prepare({
+        count: achievement.count,
+        countTill: achievement.countTill,
+        repeat: achievement.repeat,
+        allowedKeyWords: achievement.allowedKeyWords,
+        allowedKeyWordTypes: achievement.allowedKeyWordTypes,
+        condition: achievement.condition,
+        callback: achievement.callback
+      });
     }
   }
   this.detach = function() {
@@ -78,13 +66,13 @@ function Achievements() {
     this.attach(achievement);
   }
   this.check = function(keyWord) {
-    array.each(function(entry) {
+    array.forEach(function(entry) {
       if(entry.repeat >= 0 && (((entry.allowedKeyWords instanceof Array && entry.allowedKeyWords.indexOf(keyWord) !== -1) ||
-            entry.allowedKeyWords === keyWord) || ((entry.allowedKeyWordTypes instanceof Array && entry.allowedKeyWordTypes.indexOf(typeof entry) !== -1) ||
-            entry.allowedKeyWordTypes === typeof keyWord)) && ((entry.condition && entry.condition(keyWord)) || !entry.condition)) {
-              if(entry.repeat === 0) entry.repeat--;
-              entry.callback(keyWord);
-            }
+         entry.allowedKeyWords === keyWord) || ((entry.allowedKeyWordTypes instanceof Array && entry.allowedKeyWordTypes.indexOf(typeof entry) !== -1) ||
+         entry.allowedKeyWordTypes === typeof keyWord)) && ((entry.condition && entry.condition(keyWord)) || !entry.condition)) {
+           if(entry.repeat === 0) entry.repeat--;
+           entry.callback(keyWord);
+         }
     });
   }
 }

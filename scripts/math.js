@@ -1,17 +1,32 @@
-(function() {
+(function(undefined) {
 
   var funcPointer = {
         log: Math.log,
         pow: Math.pow
-      }, isNumber = function(n) {
-        return isNaN(n) === false &&
-             (typeof n === "number" ||
-                     n instanceof Number === true);
-      }, isFloat = function(n) {
+      },
+      isNumber = Number.isNumber,
+      isFloat = function(n) {
         return /\./.test(n);
-      }, undefined;
+      };
 
   // Number.prototype
+  Number.prototype.toFract = function() {
+    var num = this.toString();
+    if(/e\+/.test(num)) return [this, 1];
+    var precision = /\d*(\.\d*)?(e-\d*)?/.exec(num),
+        divident, divisor, greatestDivisor;
+    precision = (precision[1] || " ").length - 1 -
+         Number((precision[2] || "" ).substr(1));
+    greatestDivisor = Math.gCommDiv(
+      (divisor  = precision.exp10()),
+      (divident = this * divisor)
+    );
+    return [
+      divident / greatestDivisor,
+      divisor  / greatestDivisor
+    ]
+  };
+
   Number.prototype.pow = function(pow) {
     return pow !== undefined?
       Math.pow(this, pow):
@@ -171,6 +186,30 @@
     return Math.acsch(this);
   };
 
+  Number.prototype.degToRad = function() {
+    return this / 180 * Math.PI;
+  };
+
+  Number.prototype.degToGrad = function () {
+    return this / 0.9;
+  };
+
+  Number.prototype.radToDeg = function() {
+    return this * 180 / Math.PI;
+  };
+
+  Number.prototype.radToGrad = function() {
+    return this / Math.PI * 200;
+  };
+
+  Number.prototype.gradToDeg = function() {
+    return this * 0.9;
+  };
+
+  Number.prototype.gradToRad = function() {
+    return this * Math.PI / 200;
+  };
+
   Number.prototype.degAdjust = function() {
     var angle = this;
     if(angle <    0) angle = angle % 360 + 360;
@@ -192,39 +231,15 @@
     return angle;
   };
 
-  Number.prototype.degToRad = function() {
-    return this / 180 * Math.PI;
-  };
-
-  Number.prototype.degToGrad = function () {
-    return this / 0.9;
-  };
-
-  Number.prototype.radToDeg = function() {
-    return this * 180 / Math.PI;
-  };
-
-  Number.prototype.radToGrad = function() {
-    return this / Math.PI * 200;
-  }
-
-  Number.prototype.gradToDeg = function() {
-    return this * 0.9;
-  }
-
-  Number.prototype.gradToRad = function() {
-    return this * Math.PI / 200;
-  }
-
   // Math
   Math.rt = function() {
     switch(arguments.length) {
       case 0: return NaN;
       case 1:
-        return isNumber(arguments[0]) === true?arguments[0].sqrt():NaN;
+        return isNumber(arguments[0])?arguments[0].sqrt():NaN;
       default:
-        return isNumber(arguments[0]) === true &&
-               isNumber(arguments[1]) === true?arguments[0].pow(1 / arguments[1]):NaN;
+        return isNumber(arguments[0]) &&
+               isNumber(arguments[1])?arguments[0].pow(1 / arguments[1]):NaN;
     }
   };
 
@@ -311,12 +326,12 @@
     switch(arguments.length) {
       case 0: return NaN;
       case 1:
-        if(isNumber(arguments[0]) === true)
+        if(isNumber(arguments[0]))
           return funcPointer.pow(arguments[0], 2);
         else throw err.type;
       default:
-        return isNumber(arguments[0]) === true &&
-               isNumber(arguments[1]) === true?funcPointer.pow(arguments[0], arguments[1]):NaN;
+        return isNumber(arguments[0]) &&
+               isNumber(arguments[1])?funcPointer.pow(arguments[0], arguments[1]):NaN;
     }
   };
 
@@ -324,29 +339,29 @@
     switch(arguments.length) {
       case 0: return NaN;
       case 1:
-        return isNumber(arguments[0]) === true?arguments[0].ln():NaN;
+        return isNumber(arguments[0])?arguments[0].ln():NaN;
       default:
-        return isNumber(arguments[0]) === true &&
-               isNumber(arguments[1]) === true?arguments[1].ln() / arguments[0].ln():NaN;
+        return isNumber(arguments[0]) &&
+               isNumber(arguments[1])?arguments[1].ln() / arguments[0].ln():NaN;
     }
   };
 
   Math.log10 = function(x) {
     if(x === undefined ||
-       isNumber(x) === false) return NaN;
+       !isNumber(x)) return NaN;
     return Math.log(10, x);
   };
 
   Math.exp10 = function(x) {
     if(x === undefined ||
-       isNumber(x) === false) return NaN;
+       !isNumber(x)) return NaN;
     return (10).pow(x);
   };
 
   Math.fac = function(n) {
     if(n === undefined ||
-       isNumber(n) === false ||
-       isFloat(n) === true ||
+       !isNumber(n) ||
+       isFloat(n) ||
        n == Infinity ||
        n < 0) return NaN;
     var result = 1;
@@ -354,9 +369,18 @@
     return result;
   };
 
+  Math.med = function() {
+    if(arguments.length < 2) return NaN;
+    return arguments.length & 1?
+      arguments[(arguments.length / 2).floor()]:
+      (arguments[arguments.length / 2] +
+       arguments[arguments.length / 2 - 1]) / 2;
+  };
+
+
   Math.sum = function(sum, index) {
     if(arguments.length === 0 ||
-       sum instanceof Array === false) return NaN;
+       !Array.isArray(sum)) return NaN;
     var result = 0, length = sum.length;
     index = isNumber(index)?index:0;
     if(index >= length) return 0;
@@ -374,9 +398,219 @@
     } while(++count < length)
     return sum / count;
   };
+
+  Math.avgVar = function() {
+    if(arguments.length < 2) return NaN;
+    var sum = 0, count = 0, length = arguments.length;
+    do {
+      sum += arguments[count].pow();
+    } while(++count < length)
+    return sum / length - Math.avg.apply(Math, arguments).pow();
+  };
+
+  Math.avgOffset = function() {
+    return (Math.avgVar.apply(Math, arguments)).sqrt() / Math.avg.apply(Math, arguments);
+  };
+
+  Math.gAvg = function() {
+    if(arguments.length < 2) return NaN;
+    var sum = 1, count = 1, length = arguments.length;
+    do {
+      sum *= arguments[count] / arguments[count - 1];
+    } while(++count < length)
+    return sum.rt(arguments.length);
+  };
+
+  Math.hAvg = function() {
+    if(arguments.length < 2) return NaN;
+    var sum = 0, count = 0, length = arguments.length;
+    do {
+      sum += 1 / arguments[count];
+    } while(++count < length)
+    return 1 / (1 / arguments.length * sum);
+  };
+
+  Math.lim = function(f, x, prec) {
+    if(x === undefined ||
+       f === undefined ||
+      !isNumber(x) ||
+      !(f instanceof Function) ||
+       x === -Infinity ||
+       x ===  Infinity ||
+      (prec !== undefined &&
+      (!isNumber(prec) ||
+      (prec <= 0))))
+         return NaN;
+    if(prec === undefined)
+         prec = 1;
+
+    var dx = (2).pow(-prec + 1),
+        tans = [
+          f.tanLine(x + dx, prec + 1),
+          f.tanLine(x - dx, prec + 1)
+        ], points = [
+          tans[0] instanceof Function?tans[0](x):NaN,
+          tans[1] instanceof Function?tans[1](x):NaN
+        ], results = [];
+
+    if(!isNaN(points[0])) results.push(points[0]);
+    if(!isNaN(points[1])) results.push(points[1]);
+
+    return results.avg();
+  };
+
+  Math.diff = function(f, x, diffClass, prec) {
+    if(x === undefined ||
+       f === undefined ||
+      !isNumber(x) ||
+      !(f instanceof Function) ||
+      (diffClass !== undefined &&
+      (!isNumber(diffClass) ||
+      (diffClass <= 0))) ||
+      (prec !== undefined &&
+      (!isNumber(prec) ||
+      (prec <= 0)))) return NaN;
+    if(diffClass === undefined)
+      diffClass = 1;
+    else if(diffClass > 1) {
+      var diff = arguments.callee;
+      return diff(function(x, prec) {
+        return diff(f, x, 1, prec);
+      }, x, diffClass - 1, prec);
+    }
+    if(prec === undefined)
+      prec = 1;
+    else prec = (2).pow(-prec + 1);
+    return Math.avg(
+        f(x, prec) - f(x - prec, prec),
+      -(f(x, prec) - f(x + prec, prec))
+    ) * 1 / prec;
+  };
+
+  Math.integrate = function(f, a, b, prec, scale) {
+    if(a === undefined ||
+       b === undefined ||
+       f === undefined ||
+      !isNumber(a) ||
+      !isNumber(b) ||
+      !(f instanceof Function) ||
+       a > b ||
+      (prec !== undefined &&
+      (!isNumber(prec) ||
+      (prec <= 0)))) return NaN;
+    if(prec === undefined)
+         prec = 1;
+    if(scale === undefined)
+      scale = true;
+    var r = (scale?(b - a).pow():
+                            (b - a)) * (2).pow(prec - 1),
+        h = (b - a) / r,
+        result = 0,
+        x = a;
+    do {
+      result += h * (f(x) + f(x += h)) / 2;
+    } while(x < b)
+    return result.abs();
+  };
+
+  Math.integRot = function(f, a, b, prec, scale) {
+    return f instanceof Function !== false?
+      Math.PI * Math.integrate(function(x) {
+        return f(x).pow();
+      }, a, b, prec, scale):NaN;
+  };
+
+  Math.comb = function(n, k) {
+    if(n === undefined ||
+       k === undefined ||
+       !isNumber(n) ||
+       !isNumber(k) ||
+       n < 0 || k < 0 || k > n)
+         return NaN;
+    if(n === k || k === 0)
+      return 1;
+    if(k === 1)
+      return n;
+    return n.fac() / (k.fac() * (n - k).fac());
+  };
+
+  Math.gCommDiv = function(a, b) {
+    if(a === undefined ||
+       b === undefined ||
+       !isNumber(a) ||
+       !isNumber(b))
+         return NaN;
+    var length;
+    if((length = arguments.length - 1) > 1) {
+      var results = [];
+      for(var index = 0; index < length; index++) {
+        results.push(
+          Math.gCommDiv(
+            arguments[index],
+            arguments[index + 1]
+          )
+        );
+      }
+      return Math.gCommDiv.apply(Math, results);
+    } else {
+      a = a.abs(); b = b.abs();
+      var divident = Math.max(a, b),
+          divisor = Math.min(a, b),
+          quotient = (divident / divisor).floor(),
+          remainder = divident % divisor;
+      while(remainder > 0) {
+        divident = divisor;
+        divisor = remainder;
+        remainder = divident % divisor;
+      }
+      return divisor;
+    }
+  };
+
+  Math.lCommMul = function(a, b) {
+    if(a === undefined ||
+       b === undefined ||
+       !isNumber(a) ||
+       !isNumber(b))
+         return NaN;
+    var length;
+    if((length = arguments.length - 1) > 1) {
+      var results = [];
+      for(var index = 0; index < length; index++) {
+        results.push(
+          Math.lCommMul(
+            arguments[index],
+            arguments[index + 1]
+          )
+        );
+      }
+      return Math.lCommMul.apply(Math, results);
+    } else return (a * b).abs() / Math.gCommDiv(a, b);
+  };
+
   // Array.prototype
   Array.prototype.avg = function() {
     return Math.avg.apply(Math, this);
+  };
+
+  Array.prototype.avgVar = function() {
+    return Math.avgVar.apply(Math, this);
+  };
+
+  Array.prototype.avgOffset = function() {
+    return Math.avgOffset.apply(Math, this);
+  };
+
+  Array.prototype.gAvg = function() {
+    return Math.gAvg.apply(Math, this);
+  };
+
+  Array.prototype.hAvg = function() {
+    return Math.hAvg.apply(Math, this);
+  };
+
+  Array.prototype.med = function() {
+    return Math.med.apply(Math, this);
   };
 
   Array.prototype.min = function() {
@@ -390,4 +624,55 @@
   Array.prototype.sum = function(index) {
     return Math.sum(this, index);
   };
+
+  // Function prototype
+  Function.prototype.d = function(diffClass) {
+    if((diffClass !== undefined &&
+      (!isNumber(diffClass) ||
+      (diffClass <= 0)))) return NaN;
+    if(diffClass === undefined)
+      diffClass = 1;
+    var f = this;
+    return function(x, prec) {
+      return Math.diff(f, x, diffClass, prec);
+    };
+  };
+
+  Function.prototype.diff = function(x, diffClass, prec) {
+    return Math.diff(this, x, diffClass, prec);
+  };
+
+  Function.prototype.lim = function(x, prec) {
+    return Math.lim(this, x, prec);
+  };
+
+  Function.prototype.tanLine = function(x, prec) {
+    if(x === undefined ||
+       !isNumber(x) ||
+       x ===  Infinity ||
+       x === -Infinity ||
+      (prec !== undefined &&
+      (!isNumber(prec) ||
+      (prec <= 0)))) return NaN;
+
+    if(prec === undefined)
+         prec = 1;
+
+    var y = this(x),
+        k = this.diff(x, 1, prec),
+        q = y - k * x;
+
+    return function(x) {
+      return k * x + q;
+    };
+  };
+
+  Function.prototype.integrate = function(a, b, prec, scale) {
+    return Math.integrate(this, a, b, prec, scale);
+  };
+
+  Function.prototype.integRot = function(a, b, prec, scale) {
+    return Math.integRot(this, a, b, prec, scale);
+  };
+
 })();

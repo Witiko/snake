@@ -26,6 +26,7 @@ Usage:
   impossible to browse the items via the for(variable in object) cycle. You
   need to browse the items using the length property and the key function.
 
+
 */
 
 var storage = (function() {
@@ -70,7 +71,7 @@ var storage = (function() {
           keys.removeByValue(item);
         },
         clear: function() {
-          keys.each(function(item) {
+          keys.forEach(function(item) {
             delete currentStorage[item];
           });
           keys.length = object.length = 0;
@@ -100,7 +101,7 @@ var storage = (function() {
           keys.removeByValue(item);
         },
         clear: function() {
-          keys.each(function(item) {
+          keys.forEach(function(item) {
             userData.erase(item);
           });
           keys.length = object.length = 0;
@@ -130,7 +131,7 @@ var storage = (function() {
           keys.removeByValue(item);
         },
         clear: function() {
-          keys.each(function(item) {
+          keys.forEach(function(item) {
             cookie.erase(item);
           });
           keys.length = object.length = 0;

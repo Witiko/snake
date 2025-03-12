@@ -1,6 +1,6 @@
 var Ego,
     canvas,
-    veilColor,
+    veilColor, veilOpacity=40,
     originalGridColor,
     originalBackgroundColor,
     originalCellColor,
@@ -16,6 +16,7 @@ var Ego,
     drawTextFactor = 0.75, // Declares how much the drawTextMultiplier matters
     centerDrawHidingDelay = 1000,
     GlowTextHidingDelay = 1000,
+    SpeedsCarouselVelocity = 80, // Declares how many milliseconds a speed will stay shown before the next rotation
     centerGrowDrawQueue = [],
     centerGlowEngaged = false,
     centerGlowDisabled = {
@@ -54,7 +55,7 @@ var Ego,
     field, fieldElement,
     width, height,
     minLarger = 30, // The minimal width / height of the game field in cells
-    minSmaller = 20, // The minimal height / height of the game field in cells
+    minSmaller = 20, // The minimal height / width of the game field in cells
     minWidth,
     minHeight,
     scoreCalcAvg = 27.5, // Speed constant, originally minWidth / minHeight, now [30, 25].avg()
@@ -263,13 +264,7 @@ var Ego,
       body,             // A list of all CSS collision classes
       head
     ],
-    speed = (function() {
-      var speed;
-      if(!storage ||
-         !(speed = Number(storage.getItem("speed"))))
-           speed = speeds[1];
-      return speed;
-    })(),
+    speed = storage?+storage.getItem("speed") || speeds[1]:speeds[1],
     performMove,
     DayTimeListener,
     listeningManager = {
@@ -291,7 +286,7 @@ var Ego,
             paused = false;
             if(result === SILENTPAUSE) silentPaused = false;
             else Pause.hide();
-            interval = (speedBoost[0] === 1 && speedBoost[1] === 0?setInterval:setTimeout)(performMove, currInterval / speedBoost[0]);
+            interval = (speedBoost[0] === 1 && speedBoost[1] === 0?setInterval:setTimeout)(performMove, currInterval / speedBoost[0], currInterval);
           }
         }
       },
@@ -337,7 +332,7 @@ function reset() {
     ).floor();
   }, applyCSS = function() {
     var append, rules;
-    if(typeof tableStyle === "undefined") {
+    if(tableStyle === undefined) {
       append = true;
       tableStyle = document.createElement("style");
       tableStyle.setAttribute("type", "text/css");
@@ -386,6 +381,7 @@ function clear() {
   eatenLegendFood = false;
   AchievementBonusFoodCollect = [0,0];
   AchievementSuperFoodCollect = [0,0];
+  FirstCombo = true;
   AchievementsListener.detach();
   centerGrowDrawQueue.length = 0;
   scoreColorTresholds.length = 0;
@@ -407,24 +403,18 @@ function clear() {
 
 function game(resetField) {
 
-  performMove = function() {
-    // Budeme potøebovat 2 promìnné
-    //  Jednu na detekci, jsme-li v poèáteèní fázi zrychlení, abychom chybnì nepoèítali s speedBoost[0] + speedBoost[1] ale jen s speedBoost[0]
-    //  V druhé bude uložen rozdíl èasù. Pakliže bude (rozdíl / speedBoost[0] + poèFáze?speedBoost[1]:0).floor() >=2, pak budeme opakovat volání metody performMove()
-    if(speedBoost[0] === 1) {
+  performMove = function(repeated) {
+    if(  speedBoost[0] === 1) {
       if(speedBoost[1] !== 0) {
-        speedBoost[1] = 0;
+         speedBoost[1]   = 0;
         interval = setInterval(performMove, currInterval);
       }
-    }
-    else {
-      interval = setTimeout(performMove, currInterval / speedBoost[0]);
-      if(speedBoost[0] > 1 + speedBoost[1])
-        speedBoost[0] -= speedBoost[1];
-      else
-        speedBoost[0] = 1;
-    }
-    field.movement.perform();
+    } else {
+      interval = setTimeout(performMove, currInterval / speedBoost[0], currInterval);
+      if(  speedBoost[0] >  1 + speedBoost[1])
+           speedBoost[0] -=     speedBoost[1];
+      else speedBoost[0]  = 1;
+    } field.movement.perform();
   };
 
   if(resetField) reset();
@@ -458,7 +448,7 @@ function game(resetField) {
         automation: {
           movement: {
             lifeTimeManager: field.lifeTimeManager,
-            pursue: {/*
+            pursue: {
               point: [
                 function() {
                   return regularFoodSpawned.legendary === true?
@@ -475,7 +465,7 @@ function game(resetField) {
                   return this.length === this._.length?this.history[this.history.length - 2]:this.lastCell;
                 }
               ],
-              */method: NONE
+              method: DIRECTIONPICKING
             }
           },
           autoSpawn: true,
@@ -502,7 +492,7 @@ function game(resetField) {
               if(speedBoost[2] + currInterval / speedBoost[0] >= currInterval) {
                 speedBoost[2] = currInterval;
                 clearTimeout(interval);
-                setTimeout(performMove, currInterval - speedBoost[2]);
+                setTimeout(performMove, currInterval - speedBoost[2], currInterval);
               } else {
                 speedBoost[2] += currInterval / speedBoost[0];
               }
@@ -563,9 +553,8 @@ function game(resetField) {
                     speedBoost[1] = newBoostReductionPerMove;
                   else
                     speedBoost[1] = ((newBoost > currBoost?newBoost:currBoost) - 1) / currNumOfBoostedMoves;
-                  interval = setTimeout(performMove, currInterval / speedBoost[0]);
+                  interval = setTimeout(performMove, currInterval / speedBoost[0], currInterval);
                 }
-                break;
             }
             AchievementsListener.check(eaten);
           },
@@ -642,11 +631,11 @@ function gameField(width, height, fieldClass, collisionList, manager) {
     return table;
   };
   this.spawn = function(x, y, what, lifeTime) {
-    if(typeof lifeTime === "number")
+    if(Number.isNumber(lifeTime))
       lifeTimeManager.set(x, y, lifeTime);
     else if((this.collisionList.indexOf(what) > -1 &&
             (!field[x] || !this.collisionList.indexOf(field[x][y])))) {
-      if(typeof lifeTime != "number")
+      if(!Number.isNumber(lifeTime))
         return;
       else lifeTimeManager.set(x, y, lifeTime);
     }
@@ -657,11 +646,11 @@ function gameField(width, height, fieldClass, collisionList, manager) {
     if(changes && this.getFree().length === 0 && !this.isFull) this.isFull = true;
   };
   this.copy = function(x, y, x2, y2, lifeTime) {
-    if(typeof lifeTime === "number")
+    if(Number.isNumber(lifeTime))
       lifeTimeManager.set(x2, y2, lifeTime);
     else if((this.collisionList.indexOf(what) > -1 &&
             (!field[x] || !this.collisionList.indexOf(field[x][y])))) {
-      if(typeof lifeTime != "number")
+      if(!Number.isNumber(lifeTime))
         return;
       else lifeTimeManager.set(x2, y2, lifeTime);
     }
@@ -673,13 +662,13 @@ function gameField(width, height, fieldClass, collisionList, manager) {
     if(changes && this.getFree().length === 0 && !this.isFull) this.isFull = true;
   };
   this.move = function(x, y, x2, y2, lifeTime) {
-    if(typeof lifeTime === "number") {
+    if(!Number.isNumber(lifeTime)) {
       lifeTimeManager.remove(x, y, lifeTime);
       lifeTimeManager.set(x2, y2, lifeTime);
     }
     else if((this.collisionList.indexOf(what) > -1 &&
             (!field[x] || !this.collisionList.indexOf(field[x][y])))) {
-      if(typeof lifeTime != "number")
+      if(!Number.isNumber(lifeTime))
         return;
       else {
         lifeTimeManager.remove(x, y, lifeTime);
@@ -774,13 +763,13 @@ function gameField(width, height, fieldClass, collisionList, manager) {
       callbacks.length = 0;
     },
     perform: function() {
-      FCCallbacks.each(function(obj) {
+      FCCallbacks.forEach(function(obj) {
         if(!obj) return false;
         else if(obj instanceof Function) obj();
         else obj.callback.call(obj.context);
       });
       lifeTimeManager.decrease();
-      callbacks.each(function(obj) {
+      callbacks.forEach(function(obj) {
         if(!obj) return false;
         else if(obj instanceof Function) obj();
         else obj.callback.call(obj.context);
@@ -810,21 +799,21 @@ function lifeTimeManager() {
   }
 
   this.get = function(x, y) {
-    if(!container[x] || typeof container[x][y] != "number")
+    if(!container[x] || !Number.isNumber(container[x][y]))
       return 0;
     return container[x][y];
   }
 
   this.getArray = function(x, y) {
     var New = [];
-    container.each(function(e){
+    container.forEach(function(e){
       New.push(e.slice(0));
     });
     return New;
   }
 
   this.set = function(x, y, value) {
-    if(!container[x] || typeof container[x][y] != "number" || container[x][y] >= value)
+    if(!container[x] || !Number.isNumber(container[x][y]) || container[x][y] >= value)
       return false;
     return container[x][y] = value;
   }
@@ -848,7 +837,7 @@ function lifeTimeManager() {
   }
 
   this.remove = function(x, y) {
-    if(!container[x] || typeof container[x][y] != "number")
+    if(!container[x] || !Number.isNumber(container[x][y]))
       return;
     if(container[x][y])
       container[x][y] = 0;
@@ -857,21 +846,21 @@ function lifeTimeManager() {
 
 lifeTimeManager.globalDecrease = function() {
   if(!this.array) return;
-  this.array.each(function(field) {
+  this.array.forEach(function(field) {
     field.decrease();
   });
 };
 
 lifeTimeManager.globalClear = function() {
   if(!this.array) return;
-  this.array.each(function(field) {
+  this.array.forEach(function(field) {
     field.clear();
   });
 };
 
 lifeTimeManager.globalRemove = function(x, y) {
   if(!this.array) return;
-  this.array.each(function(field) {
+  this.array.forEach(function(field) {
     field.remove(x, y);
   });
 };
@@ -884,7 +873,7 @@ lifeTimeManager.globalDestroy = function() {
 function PrepareAchievements(speed, data, outputArray) {
   // Parse and consolidate the Dynamic Data
   var result = [], adopt = [], dynamicAmount = 0, dynamicIndex = 1;
-  data.each(function(data) {
+  data.forEach(function(data) {
     var index = 0;
     if(data.text instanceof Array) {
       for(index = data.text[1]; index <= data.text[2]; index++) {
@@ -914,21 +903,21 @@ function PrepareAchievements(speed, data, outputArray) {
     }
   });
 
-  result.each(function(result, index) {
+  result.forEach(function(result, index, that) {
     if(result.score === "$") {
       result.score = dynamicIndex++ * maxEaten / dynamicAmount;
       if(result.first) scoreColorTresholds.push(calcScore(result.score));
     } else if(result.score === "$$") {
       result.score = dynamicIndex++ * maxEaten / dynamicAmount;
       adopt.push(result);
-      this.remove(index);
+      that.remove(index);
     }
   });
 
-  adopt.each(function(adopt) {
+  adopt.forEach(function(adopt) {
     var offsetArray = [];
-    result.each(function(result) {
-      if(typeof result.score === "number")
+    result.forEach(function(result) {
+      if(Number.isNumber(result.score))
         offsetArray.push(Math.abs(result.score - adopt.score));
     });
     match = offsetArray.indexOf(Math.min.apply(Math, offsetArray));
@@ -944,7 +933,7 @@ function PrepareAchievements(speed, data, outputArray) {
 
   // Create an array of objects fit for the Achievements class
   if(outputArray.length > 0) outputArray.length = 0;
-  result.each(function(field) {
+  result.forEach(function(field) {
     outputArray.push({
       count: false,
       repeat: false,
@@ -991,7 +980,7 @@ function modeSwitch(mode) {
                 listeningManager.listener(SILENTPAUSE);
               listeningManager.listen();
             }
-            openGUIs.each(function(GUI) {
+            openGUIs.forEach(function(GUI) {
               GUI.show();
             });
             focus();
@@ -1002,7 +991,7 @@ function modeSwitch(mode) {
       keyListenerListening = listeningManager.listening;
 
   switchingModes = true;
-  GUI.instances.each(function(GUInst) {
+  GUI.instances.forEach(function(GUInst) {
     if(GUInst.status !== GUI.HIDDEN)
        openGUIs.push(GUInst);
   });
@@ -1045,7 +1034,7 @@ function modeSwitch(mode) {
   }
   speed = newSpeed;
   currInterval = calcInterval();
-  if(setBoost) interval = setTimeout (performMove, currInterval / speedBoost[0]);
+  if(setBoost) interval = setTimeout (performMove, currInterval / speedBoost[0], currInterval);
   else         interval = setInterval(performMove, currInterval);
 };*/
 
@@ -1223,7 +1212,7 @@ function drawStars(position) {
 
 function undrawStars(index) {
   if(index > starsSpans.length-1) return false;
-  window.clearInterval(starsAnim[index]);
+  clearInterval(starsAnim[index]);
   canvas.removeChild(starsSpans[index]);
   stars.splice(index,1);
   starsAnim.splice(index,1);
@@ -1232,8 +1221,8 @@ function undrawStars(index) {
 
 function undrawAllStars() {
   if(starsSpans.length === 0) return false;
-  starsSpans.each(function(span, index) {
-    window.clearInterval(starsAnim[index]);
+  starsSpans.forEach(function(span, index) {
+    clearInterval(starsAnim[index]);
     canvas.removeChild(span);
     stars.splice(index, 3);
     starsAnim.splice(index, 3);
@@ -1328,7 +1317,7 @@ function centerGrowDraw(flightDelay,delay,colorArray,size,finalSize,text,inner) 
     }, function() {
       score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2)+"px";
       score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2)+"px";
-      var sizeInterval = Graphics.ResizingTexts === true && Graphics.Transparency === true && Graphics.GlowTextHidingAndEnlarging === true?window.setTimeout(
+      var sizeInterval = Graphics.ResizingTexts === true && Graphics.Transparency === true && Graphics.GlowTextHidingAndEnlarging === true?setTimeout(
         function() {
           sizeInterval = textResize(
             score,
@@ -1359,7 +1348,7 @@ function centerGrowDraw(flightDelay,delay,colorArray,size,finalSize,text,inner) 
           retransparent(score, GlowTextHidingDelay, 100, 0,function(){
             if(sizeInterval) {
               if(sizeInterval instanceof Function) sizeInterval();
-              else window.clearTimeout(sizeInterval);
+              else clearTimeout(sizeInterval);
             }
             if(colorInterval[0]) colorInterval[0]();
             if(colorInterval[1]) colorInterval[1]();
@@ -1382,7 +1371,7 @@ function centerGrowDraw(flightDelay,delay,colorArray,size,finalSize,text,inner) 
           hide(score);
           if(sizeInterval) {
             if(sizeInterval instanceof Function) sizeInterval();
-            else window.clearTimeout(sizeInterval);
+            else clearTimeout(sizeInterval);
           }
           if(colorInterval[0]) colorInterval[0]();
           if(colorInterval[1]) colorInterval[1]();
@@ -1552,7 +1541,7 @@ function spawn(what) {
         } else {
           var timeout = setTimeout(despawn, fadeInterval);
           this.anim = function() {
-            window.clearTimeout(timeout);
+            clearTimeout(timeout);
             field.clearObject(position[0],position[1]);
           }
         }
@@ -1592,7 +1581,7 @@ function spawn(what) {
           else {
             var timeout = setTimeout(warp, fadeInterval);
             this.anim = function() {
-              window.clearTimeout(timeout);
+              clearTimeout(timeout);
               AchievementBonusFoodFading = false;
               bonusFoodSpawned.anim = false;
             }
@@ -1658,7 +1647,7 @@ function spawn(what) {
           else {
             var timeout = setTimeout(warp, fadeInterval);
             this.anim = function() {
-              window.clearTimeout(timeout);
+              clearTimeout(timeout);
               AchievementLegendFoodFading = false;
               bonusFoodSpawned.anim = false;
             }
@@ -1716,51 +1705,18 @@ function getPos(obj) {
   return curleft;
 };
 
-/*var isEventSupported = (function(){
-  var TAGNAMES = {
-    'select':'input','change':'input',
-    'submit':'form','reset':'form',
-    'error':'img','load':'img','abort':'img'
-  }
-  function isEventSupported(eventName) {
-    var el = document.createElement(TAGNAMES[eventName] || 'div');
-    eventName = 'on' + eventName;
-    var isSupported = (eventName in el);
-    if (!isSupported) {
-      el.setAttribute(eventName, 'return;');
-      isSupported = typeof el[eventName] == 'function';
-    }
-    el = null;
-    return isSupported;
-  }
-  return isEventSupported;
-})();
-*/
-/*
- This functions returns an array containing 36 points to draw an
- ellipse.
-
- @param x {double} X coordinate
- @param y {double} Y coordinate
- @param a {double} Semimajor axis
- @param b {double} Semiminor axis
- @param angle {double} Angle of the ellipse
- @param round {boolean} Whether or not will the poits be rounded to a Number from a Float
- @param steps {int} Number of steps
-
-*/
 function calculateEllipse(round, x, y, a, b, angle, steps) {
   if(steps === null)
     steps = 36;
   var points = [];
 
   // Angle is given by Degree Value
-  var beta = -angle * (Math.PI / 180); //(Math.PI/180) converts Degree Value into Radians
+  var beta = -angle.degToRad();
   var sinbeta = Math.sin(beta);
   var cosbeta = Math.cos(beta);
 
   for(var i = 0; i < 360; i += 360 / steps) {
-    var alpha = i * (Math.PI / 180) ;
+    var alpha = i.degToRad();
     var sinalpha = Math.sin(alpha);
     var cosalpha = Math.cos(alpha);
     if(round) points.push([Math.round(x + (a * cosalpha * cosbeta - b * sinalpha * sinbeta)), Math.round(a * cosalpha * sinbeta + b * sinalpha * cosbeta)]);
@@ -1783,11 +1739,11 @@ var colorTransition = function(oldColor, newColor) {
   this.input = [oldColor, newColor];
   this.oldColor = /#(.{2})(.{2})(.{2})/.exec(oldColor).slice(1);
   this.newColor = /#(.{2})(.{2})(.{2})/.exec(newColor).slice(1);
-  this.oldColor.each(function(item, index) {
-    this[index] = parseInt(item, 16);
+  this.oldColor.forEach(function(item, index, that) {
+    that[index] = parseInt(item, 16);
   });
-  this.newColor.each(function(item, index) {
-    this[index] = parseInt(item, 16);
+  this.newColor.forEach(function(item, index, that) {
+    that[index] = parseInt(item, 16);
   });
 }
 
@@ -1801,6 +1757,73 @@ colorTransition.prototype.calc = function(ratio) {
   if(g.length === 1) g = "0" + g;
   if(b.length === 1) b = "0" + b;
   return "#" + r + g + b;
+};
+
+Array.prototype.removeByValue = Array.prototype.erase;
+
+Array.prototype.removeByLastValue = function(value) {
+  var index = this.lastIndexOf(value);
+  return index !== -1?this.remove(index):this.length;
+};
+
+var addListener = !window.addEventListener?function(type, listener) {
+  document.body.attachEvent("on" + type, listener);
+}:function(type, listener) {
+  window.addEventListener(type, listener, false);
+}, remListener = !window.removeEventListener?function(type, listener) {
+  document.body.detachEvent("on" + type, listener);
+}:function(type, listener) {
+  window.removeEventListener(type, listener, false);
+};
+
+Array.prototype.minArray = function() {
+  var min = this.min(),
+      array = [],
+      index = 0;
+  do {
+    if((index = this.indexOf(min, index)) !== -1)
+      array.push(index);
+  } while(index++ > -1)
+  return array;
+};
+
+Array.prototype.maxArray = function() {
+  var max = this.max(),
+      array = [],
+      index = 0;
+  do {
+    if((index = this.indexOf(max, index)) !== -1)
+      array.push(index);
+  } while(index++ > -1)
+  return array;
+};
+
+Array.prototype.each = function(callback, from, to) {
+  var length = this.length;
+  if(callback instanceof Function === false ||
+     length === 0) return this;
+
+  if(from === undefined)
+     from  = 0;
+  if(to === undefined)
+     to  = from < 0 && -from < length?0:length - 1;
+
+  if(from < 0)
+    from = -from >= length?0:length + from;
+  else if(from > length - 1)
+    from = length - 1;
+
+  if(to < 0)
+     to = -to >= length?(from > 0?0:length - 1):length + to;
+  else if(to > length - 1)
+    to = length - 1;
+
+  if(from > to) do {
+    if(callback.call(this, this[from], from) === false) return false;
+  } while(from-- !== to) else if(from < to) do {
+    if(callback.call(this, this[from], from) === false) return false;
+  } while(from++ !== to) else if(callback.call(this, this[from], from) === false)
+  return false; return this;
 };
 
 Number.prototype.group = function(comma, decimals) {
