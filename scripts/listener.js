@@ -36,20 +36,20 @@ function Listener() {
           e.returnValue = false;
           return false;
         }
-        var found = false;
-        for(var count = 0; count < codes.length; count++) {
+        var found = -1;
+        codes.each(function(code, count) {
           if(
-            codes[count]["shiftKey"] == e.shiftKey &&
-            codes[count]["ctrlKey"] == e.ctrlKey &&
-            codes[count]["altKey"] == e.altKey &&
+            code["shiftKey"] == e.shiftKey &&
+            code["ctrlKey"] == e.ctrlKey &&
+            code["altKey"] == e.altKey &&
             (returnCodes[e.keyCode] ||
-            (codes[count]["keyCode"] == e.keyCode ||
-            (typeof codes[count]["keyCode"] == "object" &&
-            codes[count]["keyCode"].indexOf(e.keyCode) >= 0)))
-          ) {found = true;break;}
-        }
-        if(!found) return true;
-        if(callback && typeof callback == "function") callback(count);
+            (code["keyCode"] == e.keyCode ||
+            (typeof code["keyCode"] == "object" &&
+            code["keyCode"].indexOf(e.keyCode) >= 0)))
+          ) {found = count; return false;}
+        });
+        if(found == -1) return true;
+        if(callback && typeof callback == "function") callback(found);
         e.returnValue = false;
         return false;
       },
@@ -77,19 +77,19 @@ function Listener() {
       listenToMouse = function(e) {
         if(!e) e = window.event;
         var button = e.which || e.button;
-        var found = false;
-        for(var count = 0; count < codes.length; count++) {
+        var found = -1;
+        codes.each(function(code, count) {
           if(
-            codes[count]["shiftKey"] == e.shiftKey &&
-            codes[count]["ctrlKey"] == e.ctrlKey &&
-            codes[count]["altKey"] == e.altKey &&
-            codes[count]["keyCode"] == "M" + button ||
-            (typeof codes[count]["keyCode"] == "object" &&
-            codes[count]["keyCode"].indexOf("M" + button) >= 0)
-          ) {found = true;break;}
-        }
-        if(!found) return true;
-        if(callback && typeof callback == "function") callback(count);
+            code["shiftKey"] == e.shiftKey &&
+            code["ctrlKey"] == e.ctrlKey &&
+            code["altKey"] == e.altKey &&
+            code["keyCode"] == "M" + button ||
+            (typeof code["keyCode"] == "object" &&
+            code["keyCode"].indexOf("M" + button) >= 0)
+          ) {found = count; return false;}
+        });
+        if(found == -1) return true;
+        if(callback && typeof callback == "function") callback(found);
         e.returnValue = false;
         return false;
       }
@@ -110,7 +110,7 @@ function Listener() {
     remListener("contextmenu",preventDefault);
     return true;
   }
-  this.startListening = function(cod,call) {
+  this.startListening = function(cod, call) {
     if(enabled || !cod || !call) return false;
     enabled = 2;
     callback = call;
@@ -126,19 +126,19 @@ function Listener() {
       }
       else keyboard = true;
     }
-    if(keyboard) addListener("keydown",listenToKeyboard);
+    if(keyboard) addListener("keydown", listenToKeyboard);
     if(mouse) {
-      addListener("mousedown",listenToMouse);
-      addListener("contextmenu",preventDefault);
+      addListener("mousedown", listenToMouse);
+      addListener("contextmenu", preventDefault);
     }
     return true;
   }
   this.stopListening = function() {
     if(enabled != 2) return;
     enabled = 0;
-    remListener("keydown",listenToKeyboard);
-    remListener("mousedown",listenToMouse);
-    remListener("contextmenu",preventDefault);
+    remListener("keydown", listenToKeyboard);
+    remListener("mousedown", listenToMouse);
+    remListener("contextmenu", preventDefault);
   }
   return true;
 }

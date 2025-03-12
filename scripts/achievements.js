@@ -12,7 +12,7 @@ Achievement
     if .repeat == false, it will serve as a private variable you can use to manually count in the condition function to decide when
     the callback function will be called. It is read-only,
   repeat - Boolean - if enabled, callback can be called countless times, otherwise it will fire only once
-  allowedKeyWords - an Array of keyWords values/ a keyWord value based on which will be determined whether or not the condition function will be called, false = all keyWords allowed
+  allowedKeyWords - an Array of keyWords values / a keyWord value based on which will be determined whether or not the condition function will be called, false = all keyWords allowed
   allowedKeyWordTypes - an Array of keyWords types / a keyWord type based on which will be determined whether or not the condition function will be called, false = all keyWord types allowed
   condition(keyWord[, Number count[, Function changeCountValue(Number NewValue)]]) - this function has to return true / false. If it returns true, the callback function is called. If undefined, the callback function is called.
   callback(keyWord[, Number count[, Function changeCountValue(Number NewValue)]]) - this function is called when the conditions set by the condition function are met

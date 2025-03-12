@@ -141,7 +141,7 @@ var uncover = function(element) {
 
 var shown = function(element) {
   if(typeof element != "object" || typeof element.style != "object") return false;
-  return element.style.display != "none" && element.style.display != "hidden";
+  return element.style.display != "none" && element.style.visibility != "hidden";
 }
 
 var hidden = function(element) {
@@ -151,5 +151,5 @@ var hidden = function(element) {
 
 var covered = function(element) {
   if(typeof element != "object" || typeof element.style != "object") return false;
-  return element.style.display == "hidden";
+  return element.style.visibility == "hidden";
 }

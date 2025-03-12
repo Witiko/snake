@@ -39,10 +39,6 @@ body {
   z-index: -2;
 }
 
-td {
-  border-width: 0px;
-}
-
 .nic {
   background-color: #FFFFFF;
 }

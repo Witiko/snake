@@ -18,9 +18,9 @@ function rotate(objectID,time,startDeg,finalDeg,callback) {
     })(index);
   }
   return function() {
-    for(var count = 0; count < calls.length; count++) {
-      clearTimeout(calls[count]);
-    }
+    calls.each(function(call) {
+      clearTimeout(call);
+    });
   }
 }
 
@@ -65,9 +65,9 @@ function move(objectID,time,x,y,x2,y2,regardWindow,callback) {
     })(index);
   }
   return function() {
-    for(var count = 0; count < calls.length; count++) {
-      clearTimeout(calls[count]);
-    }
+    calls.each(function(call) {
+      clearTimeout(call);
+    });
   }
 }
 
@@ -112,9 +112,9 @@ function textMove(objectID,time,x,y,x2,y2,shadow,regardWindow,callback) {
     })(index);
   }
   return function() {
-    for(var count = 0; count < calls.length; count++) {
-      clearTimeout(calls[count]);
-    }
+    calls.each(function(call) {
+      clearTimeout(call);
+    });
   }
 }
 
@@ -158,9 +158,9 @@ function textResize(objectID,time,oldsize,newsize,partialCallback,callback) {
         })(index);
     }
     return function() {
-      for(var count = 0; count < calls.length; count++) {
-        clearTimeout(calls[count]);
-      }
+      calls.each(function(call) {
+        clearTimeout(call);
+      });
     }
 }
 
@@ -191,9 +191,9 @@ function recolor(time,oldcolor,newcolor,partialCallback,callback) {
         })(index);
     }
     return function() {
-      for(var count = 0; count < calls.length; count++) {
-        clearTimeout(calls[count]);
-      }
+      calls.each(function(call) {
+        clearTimeout(call);
+      });
     }
 }
 
@@ -234,9 +234,9 @@ function resize(objectID,time,oldwidth,oldheight,newwidth,newheight,regardWindow
         })(index);
     }
     return function() {
-      for(var count = 0; count < calls.length; count++) {
-        clearTimeout(calls[count]);
-      }
+      calls.each(function(call) {
+        clearTimeout(call);
+      });
     }
 }
 
@@ -291,9 +291,9 @@ function retransparent(objectID,time,transparency_start,transparency_end,callbac
     }
   }
   return function() {
-    for(var count = 0; count < calls.length; count++) {
-      clearTimeout(calls[count]);
-    }
+    calls.each(function(call) {
+      clearTimeout(call);
+    });
   }
 }
 
