@@ -402,7 +402,6 @@ function clear() {
 };
 
 function game(resetField) {
-
   performMove = function(repeated) {
     if(  speedBoost[0] === 1) {
       if(speedBoost[1] !== 0) {
@@ -417,190 +416,214 @@ function game(resetField) {
     } field.movement.perform();
   };
 
-  if(resetField) reset();
-  if(first) {
-    if(window.google && google.loader && google.loader.ClientLocation) {
-      DayTimeListener = new DayTime(google.loader.ClientLocation.latitude,
-                                    google.loader.ClientLocation.longitude);
-     (DayTimeListener.now === DayTime.DAY?Day:Night).Apply();
-      DayTimeListener.listen(modeSwitch);
-    } else Day.Apply();
-    GUIInit();
+  function showMenu() {
+    focus(); Menu.show(undefined, {
+      showScore: !first,
+      callback: function() {
+        if(first) first = false;
+        else clear();
+
+        maxScore = calcScore(maxEaten);
+        PrepareAchievements(speed, ScoreAchievements, DynamicAchievementsList);
+        AchievementsListener.attach(StaticAchievementsList);
+        AchievementsListener.attach(DynamicAchievementsList);
+        currInterval = calcInterval();
+        spawn(food);
+
+        Ego = new Snake(field, {
+          head: head,
+          body: body,
+          length: defaultLength,
+          automation: {
+            movement: {
+              lifeTimeManager: field.lifeTimeManager,
+              pursue: {
+                point: [
+                  function() {
+                    return regularFoodSpawned.legendary === true?
+                           regularFoodSpawned.position:false;
+                  },
+                  function() {
+                    return bonusFoodSpawned !== null?
+                           bonusFoodSpawned.position:false;
+                  },
+                  function() {
+                    return regularFoodSpawned.position;
+                  },
+                  function() {
+                    return this.length === this._.length?this.history[this.history.length - 2]:this.lastCell;
+                  }
+                ],
+                method: NONE
+              }
+            },
+            autoSpawn: true,
+            drawStars: true
+          },
+          collision: {
+            walls: TRANSIT,
+            body: true,
+            items: true
+          },
+          callbacks: {
+            death: function() {
+              if(speedBoost[0] === 1 ||
+                (speedBoost[0] > 1 && speedBoost[2] === currInterval)) {
+                (speedBoost[0] === 1 && speedBoost[1] === 0?clearInterval:clearTimeout)(interval);
+                centerGrowDrawQueue.length = 0;
+                listeningManager.stopListening();
+                Buffer.unregister();
+                paused = true;
+                // Doèasné
+                Cursor.Show();
+                // AchievementsListener.check("death"); - Not needed atm
+              } else {
+                if(speedBoost[2] + currInterval / speedBoost[0] >= currInterval) {
+                  speedBoost[2] = currInterval;
+                  clearTimeout(interval);
+                  setTimeout(performMove, currInterval - speedBoost[2], currInterval);
+                } else {
+                  speedBoost[2] += currInterval / speedBoost[0];
+                }
+                // For testing purposes only
+                // console.log("CurrInterval: " + currInterval + ", SpeedBoostedCurrInterval: " + currInterval / speedBoost[0] + ", CurrentOffset: " + speedBoost[2]);
+                return false;
+              }
+            },
+            tailMiss: function() {
+              AchievementsListener.check("tailMiss");
+            },
+            afterDeath: game,
+            collision: function(x, y, get) {
+              var currBoost = speedBoost[0],
+                  currBoostReductionPerMove = speedBoost[1],
+                  currNumOfBoostedMoves = currBoostReductionPerMove?
+                    Math.floor((currBoost - 1) / currBoostReductionPerMove):0,
+                  newBoost,
+                  newBoostReductionPerMove,
+                  newNumOfBoostedMoves;
+              switch(get) {
+                case food:
+                case superFood:
+                case bonusFood:
+                case legendFood:
+                  FullscreenGlow(currInterval * foodGlowLength[get], gridColors[foodGridColors[get]], foodGridColors[get]);
+                  score = calcScore(eaten += foodBonuses[get]);
+                  this.length = defaultLength + Math.round(eaten * lengthMultiplier);
+                  if(get !== food)
+                    ScalingSystem.set(SKILL);
+                  AchievementsListener.check(get);
+                  if(get === legendFood) {
+                    eatenLegendFood = true;
+                    regularFoodSpawned.remove();
+                  } else if(get === bonusFood || get === superFood) {
+                    bonusFoodSpawned.remove();
+                    bonusFoodSpawnMoves = calcBonusFoodSpawn(this.length + 1);
+                  } else {
+                    if(!bonusFoodSpawned && bonusFoodSpawnMoves - movesCounter >= 3000 / currInterval)
+                      movesCounter += Math.round(1000 / currInterval);
+                    // Mínus 1000 ms v tazích èekání na bonus pøi snìdení normálního jídla, 3 sekundy se vždy ponechají
+                  }
+                  snakeDraw([x,y], foodScoreTextHideDelay[get], sTextColors[foodSTextColors[get]], "score", (score >= 1000?0.9:1) * foodScoreTextSize[get], score >= 1000?score.group():score);
+                  field.remove(x,y);
+                  this.move(false);
+                  if(get === legendFood)
+                    regularFoodSpawned.legendary = false;
+                  if(get === food || get === legendFood)
+                    spawn(food);
+                  if(speedBoost[3]) {
+                    (speedBoost[0] === 1 && speedBoost[1] === 0?clearInterval:clearTimeout)(interval);
+                    newBoost = foodBoosts[get][0] * speedBoost[3];
+                    newBoostReductionPerMove = (foodBoosts[get][0] - 1) / (Math.avg(width, height) * foodBoosts[get][1])
+                    newNumOfBoostedMoves = Math.floor((newBoost - 1) / newBoostReductionPerMove);
+                    if(newBoost > currBoost)
+                      speedBoost[0] = newBoost;
+                    if(newNumOfBoostedMoves >= currNumOfBoostedMoves)
+                      speedBoost[1] = newBoostReductionPerMove;
+                    else
+                      speedBoost[1] = ((newBoost > currBoost?newBoost:currBoost) - 1) / currNumOfBoostedMoves;
+                    interval = setTimeout(performMove, currInterval / speedBoost[0], currInterval);
+                  }
+              }
+              AchievementsListener.check(eaten);
+            },
+            directionChange: function() {
+              AchievementsListener.check("changeDirection");
+            },
+            lengthChange: function(length) {
+              if(speedBoost[3] !== 0) {
+                speedBoost[3] = 1 - (this.length + 1) / (0.75 * width * height);
+                if(speedBoost[3] < 0) speedBoost[3] = 0;
+              }
+            },
+            move: function() {
+              //AchievementsListener.check("move"); - Not needed atm
+              if(speedBoost[2] !== 0) speedBoost[2] = 0;
+              // For testing purposes only, displays the remaining turns to the de/spawning of the bonus food
+              // if(bonusFoodSpawned) snakeDraw(Ego.position,0,sTextColors[bonusFoodSpawned.extra?2:1],"score",0.6,bonusFoodSpawned.lifetime - movesCounter === Infinity?"Anim":bonusFoodSpawned.lifetime - movesCounter);
+              // else snakeDraw(Ego.position,0,sTextColors[0],"score",0.6,bonusFoodSpawnMoves - movesCounter);
+              if(bonusFoodSpawned && movesCounter >= bonusFoodSpawned.lifetime) {
+                bonusFoodSpawned.lifetime = Infinity;
+                if(bonusFoodSpawned.extra) {
+                  bonusFoodSpawned.warp();
+                } else {
+                  bonusFoodSpawned.despawn();
+                }
+              }
+              if(!bonusFoodSpawned && movesCounter >= bonusFoodSpawnMoves) {
+                spawn(toss(superFoodChance[3]())?superFood:bonusFood);
+                // For testing purposes only
+                // console.log("Epic food spawn chance: " + (100 * superFoodChance[3]()) + "%");
+              }
+            }
+          },
+          position: [Math.round((width-1)/2), Math.round((height-1)/2)],
+          direction: Math.round(Math.random()*3)
+        });
+        field.movement.addCallback(function(){
+          movesCounter++;
+        });
+        Cursor.Hide();
+        bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + 1);
+        interval = setInterval(performMove, currInterval);
+        Buffer.register(Ego);
+        listeningManager.listen();
+      }
+    });
   }
 
-  focus(); Menu.show(undefined, {
-    showScore: !first,
-    callback: function() {
-      if(first) first = false;
-      else clear();
-
-      maxScore = calcScore(maxEaten);
-      PrepareAchievements(speed, ScoreAchievements, DynamicAchievementsList);
-      AchievementsListener.attach(StaticAchievementsList);
-      AchievementsListener.attach(DynamicAchievementsList);
-      currInterval = calcInterval();
-      spawn(food);
-
-      Ego = new Snake(field, {
-        head: head,
-        body: body,
-        length: defaultLength,
-        automation: {
-          movement: {
-            lifeTimeManager: field.lifeTimeManager,
-            pursue: {
-              point: [
-                function() {
-                  return regularFoodSpawned.legendary === true?
-                         regularFoodSpawned.position:false;
-                },
-                function() {
-                  return bonusFoodSpawned !== null?
-                         bonusFoodSpawned.position:false;
-                },
-                function() {
-                  return regularFoodSpawned.position;
-                },
-                function() {
-                  return this.length === this._.length?this.history[this.history.length - 2]:this.lastCell;
-                }
-              ],
-              method: NONE
-            }
-          },
-          autoSpawn: true,
-          drawStars: true
-        },
-        collision: {
-          walls: TRANSIT,
-          body: true,
-          items: true
-        },
-        callbacks: {
-          death: function() {
-            if(speedBoost[0] === 1 ||
-              (speedBoost[0] > 1 && speedBoost[2] === currInterval)) {
-              (speedBoost[0] === 1 && speedBoost[1] === 0?clearInterval:clearTimeout)(interval);
-              centerGrowDrawQueue.length = 0;
-              listeningManager.stopListening();
-              Buffer.unregister();
-              paused = true;
-              // Doèasné
-              Cursor.Show();
-              // AchievementsListener.check("death"); - Not needed atm
-            } else {
-              if(speedBoost[2] + currInterval / speedBoost[0] >= currInterval) {
-                speedBoost[2] = currInterval;
-                clearTimeout(interval);
-                setTimeout(performMove, currInterval - speedBoost[2], currInterval);
-              } else {
-                speedBoost[2] += currInterval / speedBoost[0];
-              }
-              // For testing purposes only
-              // console.log("CurrInterval: " + currInterval + ", SpeedBoostedCurrInterval: " + currInterval / speedBoost[0] + ", CurrentOffset: " + speedBoost[2]);
-              return false;
-            }
-          },
-          tailMiss: function() {
-            AchievementsListener.check("tailMiss");
-          },
-          afterDeath: game,
-          collision: function(x, y, get) {
-            var currBoost = speedBoost[0],
-                currBoostReductionPerMove = speedBoost[1],
-                currNumOfBoostedMoves = currBoostReductionPerMove?
-                  Math.floor((currBoost - 1) / currBoostReductionPerMove):0,
-                newBoost,
-                newBoostReductionPerMove,
-                newNumOfBoostedMoves;
-            switch(get) {
-              case food:
-              case superFood:
-              case bonusFood:
-              case legendFood:
-                FullscreenGlow(currInterval * foodGlowLength[get], gridColors[foodGridColors[get]], foodGridColors[get]);
-                score = calcScore(eaten += foodBonuses[get]);
-                this.length = defaultLength + Math.round(eaten * lengthMultiplier);
-                if(get !== food)
-                  ScalingSystem.set(SKILL);
-                AchievementsListener.check(get);
-                if(get === legendFood) {
-                  eatenLegendFood = true;
-                  regularFoodSpawned.remove();
-                } else if(get === bonusFood || get === superFood) {
-                  bonusFoodSpawned.remove();
-                  bonusFoodSpawnMoves = calcBonusFoodSpawn(this.length + 1);
-                } else {
-                  if(!bonusFoodSpawned && bonusFoodSpawnMoves - movesCounter >= 3000 / currInterval)
-                    movesCounter += Math.round(1000 / currInterval);
-                  // Mínus 1000 ms v tazích èekání na bonus pøi snìdení normálního jídla, 3 sekundy se vždy ponechají
-                }
-                snakeDraw([x,y], foodScoreTextHideDelay[get], sTextColors[foodSTextColors[get]], "score", (score >= 1000?0.9:1) * foodScoreTextSize[get], score >= 1000?score.group():score);
-                field.remove(x,y);
-                this.move(false);
-                if(get === legendFood)
-                  regularFoodSpawned.legendary = false;
-                if(get === food || get === legendFood)
-                  spawn(food);
-                if(speedBoost[3]) {
-                  (speedBoost[0] === 1 && speedBoost[1] === 0?clearInterval:clearTimeout)(interval);
-                  newBoost = foodBoosts[get][0] * speedBoost[3];
-                  newBoostReductionPerMove = (foodBoosts[get][0] - 1) / (Math.avg(width, height) * foodBoosts[get][1])
-                  newNumOfBoostedMoves = Math.floor((newBoost - 1) / newBoostReductionPerMove);
-                  if(newBoost > currBoost)
-                    speedBoost[0] = newBoost;
-                  if(newNumOfBoostedMoves >= currNumOfBoostedMoves)
-                    speedBoost[1] = newBoostReductionPerMove;
-                  else
-                    speedBoost[1] = ((newBoost > currBoost?newBoost:currBoost) - 1) / currNumOfBoostedMoves;
-                  interval = setTimeout(performMove, currInterval / speedBoost[0], currInterval);
-                }
-            }
-            AchievementsListener.check(eaten);
-          },
-          directionChange: function() {
-            AchievementsListener.check("changeDirection");
-          },
-          lengthChange: function(length) {
-            if(speedBoost[3] !== 0) {
-              speedBoost[3] = 1 - (this.length + 1) / (0.75 * width * height);
-              if(speedBoost[3] < 0) speedBoost[3] = 0;
-            }
-          },
-          move: function() {
-            //AchievementsListener.check("move"); - Not needed atm
-            if(speedBoost[2] !== 0) speedBoost[2] = 0;
-            // For testing purposes only, displays the remaining turns to the de/spawning of the bonus food
-            // if(bonusFoodSpawned) snakeDraw(Ego.position,0,sTextColors[bonusFoodSpawned.extra?2:1],"score",0.6,bonusFoodSpawned.lifetime - movesCounter === Infinity?"Anim":bonusFoodSpawned.lifetime - movesCounter);
-            // else snakeDraw(Ego.position,0,sTextColors[0],"score",0.6,bonusFoodSpawnMoves - movesCounter);
-            if(bonusFoodSpawned && movesCounter >= bonusFoodSpawned.lifetime) {
-              bonusFoodSpawned.lifetime = Infinity;
-              if(bonusFoodSpawned.extra) {
-                bonusFoodSpawned.warp();
-              } else {
-                bonusFoodSpawned.despawn();
-              }
-            }
-            if(!bonusFoodSpawned && movesCounter >= bonusFoodSpawnMoves) {
-              spawn(toss(superFoodChance[3]())?superFood:bonusFood);
-              // For testing purposes only
-              // console.log("Epic food spawn chance: " + (100 * superFoodChance[3]()) + "%");
-            }
-          }
-        },
-        position: [Math.round((width-1)/2), Math.round((height-1)/2)],
-        direction: Math.round(Math.random()*3)
-      });
-      field.movement.addCallback(function(){
-        movesCounter++;
-      });
-      Cursor.Hide();
-      bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + 1);
-      interval = setInterval(performMove, currInterval);
-      Buffer.register(Ego);
-      listeningManager.listen();
+  if(resetField) reset();
+  if(first) {
+    function noGeolocation() {
+      if(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        Night.Apply();
+      } else {
+        Day.Apply();
+      }
     }
-  });
+    if(navigator.geolocation && navigator.geolocation.getCurrentPosition) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        DayTimeListener = new DayTime(position.coords.latitude,
+                                      position.coords.longitude);
+       (DayTimeListener.now === DayTime.DAY?Day:Night).Apply();
+        DayTimeListener.listen(modeSwitch);
+        GUIInit();
+        showMenu();
+      }, function() {
+        noGeolocation();
+        GUIInit();
+        showMenu();
+      }, {
+        enableHighAccuracy: false,
+        timeout: 5000,
+        maximumAge: Infinity,
+      });
+    } else {
+      noGeolocation();
+      GUIInit();
+      showMenu();
+    }
+  }
 };
 
 function gameField(width, height, fieldClass, collisionList, manager) {
