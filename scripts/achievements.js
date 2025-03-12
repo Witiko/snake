@@ -8,9 +8,9 @@ Achievements()
 
 Achievement
   count - Boolean - provides the condition and callback functions with second Boolean argument called count and a third argument changeCountValue, these arguments have two functionalities:
-    if .repeat == true, it increases its value by one on every callback function call
-    if .repeat == false, it will serve as a private variable you can use to manually count in the condition function to decide when
-    the callback function will be called. It is read-only,
+    if .repeat === true, it increases its value by one on every callback function call
+    if .repeat === false, it will serve as a private object you can use to manually count in the condition function to decide when
+      the callback function will be called.
   repeat - Boolean - if enabled, callback can be called countless times, otherwise it will fire only once
   allowedKeyWords - an Array of keyWords values / a keyWord value based on which will be determined whether or not the condition function will be called, false = all keyWords allowed
   allowedKeyWordTypes - an Array of keyWords types / a keyWord type based on which will be determined whether or not the condition function will be called, false = all keyWord types allowed
@@ -26,7 +26,7 @@ function Achievements() {
       var callback = object.callback;
       var count = 0;
       object.callback = function(keyWord) {
-        if(object.repeat == 1) count++;
+        if(object.repeat === 1) count++;
         callback(keyWord, count, function(value){
           count = value;
         });
@@ -41,11 +41,11 @@ function Achievements() {
     array.push(object);
   }
   this.attach = function(achievement) {
-    if(typeof achievement!= "object") return;
+    if(typeof achievement!== "object") return;
     var object;
     if(achievement.length) {
       for(var counter = 0; counter < achievement.length; counter ++) {
-        if(achievement[counter].count != null && achievement[counter].repeat != null && typeof achievement[counter].condition == "function" && achievement[counter].callback) {
+        if(achievement[counter].count !== null && achievement[counter].repeat !== null && achievement[counter].callback) {
           object = {
             count: achievement[counter].count,
             repeat: achievement[counter].repeat,
@@ -58,7 +58,7 @@ function Achievements() {
         }
       }
     } else {
-      if(achievement.count == null || achievement.repeat == null || typeof achievement.condition != "function" || !achievement.callback) return;
+      if(achievement.count === null || achievement.repeat === null || !achievement.callback) return;
       object = {
         count: achievement[counter].count,
         repeat: achievement[counter].repeat,
@@ -78,14 +78,13 @@ function Achievements() {
     this.attach(achievement);
   }
   this.check = function(keyWord) {
-    for(var counter = 0; counter < array.length; counter ++) {
-      if(array[counter].repeat >= 0
-       && ((array[counter].allowedKeyWordTypes !== false && ((typeof array[counter].allowedKeyWordTypes == "object" && array[counter].allowedKeyWordTypes.indexOf(typeof keyWord) > -1) || (typeof array[counter].allowedKeyWordTypes != "object" && array[counter].allowedKeyWordTypes == typeof keyWord))) || array[counter].allowedKeyWordTypes === false)
-       && ((array[counter].allowedKeyWords !== false && ((typeof array[counter].allowedKeyWords == "object" && array[counter].allowedKeyWords.indexOf(keyWord) > -1) || (typeof array[counter].allowedKeyWords != "object" && array[counter].allowedKeyWords == keyWord))) || array[counter].allowedKeyWords === false)
-       && (array[counter].condition && array[counter].condition(keyWord)) || !array[counter].condition) {
-        if(array[counter].repeat == 0) array[counter].repeat--;
-        array[counter].callback(keyWord);
-      }
-    }
+    array.each(function(entry) {
+      if(entry.repeat >= 0 && (((entry.allowedKeyWords instanceof Array && entry.allowedKeyWords.indexOf(keyWord) !== -1) ||
+            entry.allowedKeyWords === keyWord) || ((entry.allowedKeyWordTypes instanceof Array && entry.allowedKeyWordTypes.indexOf(typeof entry) !== -1) ||
+            entry.allowedKeyWordTypes === typeof keyWord)) && ((entry.condition && entry.condition(keyWord)) || !entry.condition)) {
+              if(entry.repeat === 0) entry.repeat--;
+              entry.callback(keyWord);
+            }
+    });
   }
 }

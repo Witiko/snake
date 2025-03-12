@@ -2,27 +2,45 @@
 <html>
   <head>
     <meta http-equiv="Content-Language" content="cs">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
     <meta http-equiv="Content-Type" content="text/html; charset=windows-1250">
     <title>Snake</title>
     <script type="text/javascript" src="./scripts/lang.js"></script>
     <script type="text/javascript" src="./config/lang.ini"></script>
     <script type="text/javascript" src="./scripts/comp.js"></script>
+    <script type="text/javascript" src="./scripts/snake.js"></script>
     <script type="text/javascript" src="./scripts/screen.js"></script>
     <script type="text/javascript" src="./scripts/listener.js"></script>
+    <script type="text/javascript" src="./config/keycodes.ini"></script>
+    <script type="text/javascript" src="./scripts/cookie.js"></script>
+    <script type="text/javascript" src="./scripts/userData.js"></script>
+    <script type="text/javascript" src="./scripts/localStorage.js"></script>
     <script type="text/javascript" src="./scripts/core.js"></script>
+    <script type="text/javascript" src="./scripts/menu.js"></script>
+    <script type="text/javascript" src="./config/menu.ini"></script>
     <script type="text/javascript" src="./scripts/effects.js"></script>
     <script type="text/javascript" src="./scripts/graphics.js"></script>
     <script type="text/javascript" src="./config/graphics.ini"></script>
-    <script type="text/javascript" src="./config/keycodes.ini"></script>
     <script type="text/javascript" src="./scripts/achievements.js"></script>
     <script type="text/javascript" src="./config/achievements.ini"></script>
+    <script type="text/javascript" src="./scripts/scaling.js"></script>
+    <script type="text/javascript" src="./scripts/math.js"></script>
+    <script type="text/javascript" src="./scripts/sunset.js"></script>
+    <script type="text/javascript" src="./scripts/buffer.js"></script>
+    <script type="text/javascript" src="./scripts/skin.js"></script>
+    <script type="text/javascript" src="./styles/skin.css"></script>
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
     <link rel="stylesheet" type="text/css" href="./styles/body.css">
   </head>
-  <body>
-   <span id="canvas">
-    <noscript>
-      Javascript disabled!
-    </noscript>
+  <body scroll="no" onscroll="return false;">
+   <span id="canvas"></span>
+   <span id="nojs">
+     Javascript disabled!
    </span>
+   <script type="text/javascript">
+     document.body.removeChild(
+       document.getElementById("nojs")
+     );
+   </script>
   </body>
 </html>

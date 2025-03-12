@@ -1,98 +1,371 @@
 var Ego,
     canvas,
-    container,
-    listener, originalGridColor = "#EAEAEA",
-    originalBackgroundColor = "#FFFFFF",
-    gridColors = [
-      ["#D0D0D0", "#F8F8F8"], // Grey
-      ["#60A800", "#C8FF95"], // Green
-      ["#B7BC23", "#FFFFB9"], // Gold
-      ["#DF3500", "#FFAEAE"], // Red
-      ["#A92FFF", "#D09DFF"], // Violet
-      ["#0088FF", "#BCDFFF"], // Blue
-      ["#FF9C2E", "#FFDEBD"]  // Orange
-    ],
-    textColors = [
-      ["#0A3700","#7EDB4B","#FFFFFF","#000000"], // Green
-      ["#414100","#E9DF3C","#FFFFFF","#000000"], // Gold
-      ["#410000","#E7431E","#FFFFFF","#000000"], // Red
-      ["#48003C","#C755FC","#FFFFFF","#000000"], // Violet
-      ["#001D58","#AFD4F9","#FFFFFF","#000000"], // Blue
-      ["#850000","#FF9C2E","#FFFFFF","#000000"], // Orange
-      ["#AA0000","#FF9C2E","#FFFFFF","#000000"]  // Red-orange
-    ],
+    veilColor,
+    originalGridColor,
+    originalBackgroundColor,
+    originalCellColor,
+    gridColors,
+    textColors,
+    speedColors,
+    sTextColors,
+    foodColors,
+    scoreColors,
+    scoreColorTresholds = [],
     positionsCache,
-    foodColors = ["#A92FFF","#60A800","#FFFFFF"],
-    movesCounter = 0,
+    drawTextMultiplier,    // Declares how much bigger than "length" the drawn texts will be
+    drawTextFactor = 0.75, // Declares how much the drawTextMultiplier matters
+    centerDrawHidingDelay = 1000,
+    GlowTextHidingDelay = 1000,
     centerGrowDrawQueue = [],
-    centerGlowDrawEngaged = false,
+    centerGlowEngaged = false,
+    centerGlowDisabled = {
+      queue: [],
+      enable: function() {
+        centerGrowDrawQueue = centerGrowDrawQueue.concat(this.queue);
+        this.queue.length = 0;
+        this.disabled = false;
+        if(centerGrowDrawQueue.length) {
+          centerGrowDraw.apply(this, centerGrowDrawQueue[0]);
+          centerGrowDrawQueue.shift();
+        }
+      },
+      disabled: false
+    },
+    Html = document.documentElement || document.getElementsByTagName("html")[0],
+    Head, Body,
+    SVGSupport = document.implementation.hasFeature(
+      "http://www.w3.org/TR/SVG11/feature#BasicStructure", "1.1"
+    ) && (function() {
+        var dataURI = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNzUiIGhlaWdodD0iMjc1Ij48L3N2Zz4%3D',
+            img = document.createElement('img');
+        img.src = dataURI;
+        return img.complete || !(img.onload = function() {
+          SVGSupport = true;
+        });
+    })(),
+    CSSFilters    = "filters"          in Html,
+    CSSTransform  = "transform"        in Html.style ||
+                    "WebkitTransform"  in Html.style ||
+                    "MozTransform"     in Html.style ||
+                    "OTransform"       in Html.style,
+    CSSOpacity    = "opacity"          in Html.style,
+    CSSGlow       = "textShadow"       in Html.style,
+    textContent   = "innerText" in document.createElement("span")?"innerText":"textContent",
     field, fieldElement,
     width, height,
-    minwidth = 15, minheight = 15,
+    minLarger = 30, // The minimal width / height of the game field in cells
+    minSmaller = 20, // The minimal height / height of the game field in cells
+    minWidth,
+    minHeight,
+    scoreCalcAvg = 27.5, // Speed constant, originally minWidth / minHeight, now [30, 25].avg()
     paused = false,
-    presetLength = 40, length,
-    defaultLength = 2,
+    silentPaused = false,
+    presetLength = 40, // The default length of one cell in square pixels
+    length,
+    defaultLength = 2, // The default snake length minus head
+    maxEaten = minLarger * minSmaller - defaultLength - 1,
+    maxScore,
     starsSpans = [], starsAnim = [], stars = [],
-    starsImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A /wD/oL2nkwAAAAlwSFlzAACNZgAAjWYBB0M1IwAAAAd0SU1FB9oIBAoMHHVA3+oAAAExSURBVBjT hY27SgNRAETP3YdZ8rBRi6CkkpBgrSIYIVgICn6GIFYBC7cUi6AWNuI32Is/YGFjQFQ0hQbEREEk MY/dzSabu9cionYODMMMBwb+yN0Bp0DO3TPP+E/ecfyid51RzVX0v7vm2r/F2WRSX5zKicwYZobz nycbDDVgxSmQ1lLRLJaxrqXHwVdKX5te9lLvp+rTKytXPgnv0Lo0t+cXAPBDlDNAuCF0JXQBP1SD m2og6oC1H3kY2ZrLKicYQp4ELwQ3ZHBXRb42ZjXLht5ubyY4KdVoSehIaA8dvjSRtUY+fkDJiBUB UG7L14UbgiOhO0wRAJKyY4MG0NnAFBOJJG2p1FsHeV9DBCgRi4LBaLz4DYo4CWGYBFeV236pkg+e G8l++fFIftQREX0J4Av08Y4EOdL+NQAAAABJRU5ErkJggg==",
-    starsNumber = 3,
-    reactionTime = 580,
-    superFoodChance = [10, 4],
-    bonusFoodHelper = 0,
-    bonusFoodSpawned = null,
-    bonusFoodSpawnMoves,
-    bonusFoodHelperStep = 1,
-    bonusFoodHelperStepBackwards = 6,
-    foodEatenAnim,
-    interval = 0, first = true,
-    maxInterval, currInterval,
-    isIE = "\v" === "v",
-    isFirefox = navigator.userAgent.indexOf("Firefox/") != -1,
-    isOpera = typeof window.opera === "object",
-    maxScore, maxEaten,
-    fieldClass = "nic",
+    starsImage,
+    starsNumber = 3, // The number of stars which float above the dazed snake's head
+    reactionTime = 580, // In milliseconds, added to the time you have to catch the bonusFood
+    superFoodChance = [ // The numbers are in the 1 / x format
+      [         // Helper 10
+        100, // When the field is empty
+        40   // When the field is full
+      ],
+      [         // Scaling 0
+        10,  // When the field is empty
+        4    // When the field is full
+      ],
+      [         // Skill 10
+        4,   // When the field is empty
+        2.5  // When the field is full
+      ],
+      function() { // The getter
+        var status = ScalingSystem.get(),
+            _ = superFoodChance;
+        if(status > 0) {
+          status = (10 - status) / 10;
+          return 1 / _[2][0] - (1 / _[2][0] - 1 / _[1][0]) * status + (
+            (1 / _[2][1] - (1 / _[2][1] - 1 / _[1][1]) * status) -
+            (1 / _[2][0] - (1 / _[2][0] - 1 / _[1][0]) * status)
+          ) * (Ego.length + 1) / (width * height);
+        }
+        if(status < 0) {
+          status = (10 + status) / 10;
+          return 1 / _[0][0] - (1 / _[0][0] - 1 / _[1][0]) * status + (
+            (1 / _[0][1] - (1 / _[0][1] - 1 / _[1][1]) * status) -
+            (1 / _[0][0] - (1 / _[0][0] - 1 / _[1][0]) * status)
+          ) * (Ego.length + 1) / (width * height);
+        }
+        return 1 / _[1][0] + (1 / _[1][1] - 1 / _[1][0]) * (Ego.length + 1) / (width * height);
+      }
+    ],
+    legendFoodChance = [ // The numbers are in the 1 / x format
+      20,  // Skill 10: When the field is empty
+      8,   //           When the field is full
+      function() { // The getter
+        var status = ScalingSystem.get(),
+                 _ = legendFoodChance;
+        return status < 5?0:
+          1 / _[0] * (status - 5) / 5 + (
+            1 / _[1] * (status - 5) / 5 -
+            1 / _[0] * (status - 5) / 5
+          ) * (Ego.length + 1) / (width * height);
+      }
+    ],
+    scalingSystemVars = [
+      1,    // Help:  Step upwards
+      4,    //        Step downwards
+      0.5,  // Skill: Step upwards
+      2     //        Step downwards
+    ],
+    bonusFoodTolerance = [      // How many times longer than the shortest path you can search for the bonusFood before it vanishes
+      1.3, // With Skill 10
+      1.8, // With Scaling 0
+      3.5, // With Helper 10
+      function() { // The getter
+        var status = ScalingSystem.get(),
+            _ = bonusFoodTolerance;
+        return status > 0?
+          _[1] - (_[1] - _[0]) *  status / 10:(
+               status < 0?
+          _[1] + (_[2] - _[1]) * -status / 10:_[1]
+          )
+      }
+    ],
+    speedBonus = [
+      1,   // The lowest speed  - 1x score
+      5    // The highest speed - 5x score
+    ],
+    speedCoeff = [
+      4,   // Speed: 1
+      1,   // Speed: 10
+      function() { // The getter
+        var _ = speedCoeff;
+        return _[0] - (_[0] - _[1]) * (speed - speeds[0]) / (speeds[2] - speeds[0])
+      }
+    ],
+    speeds = [
+      1,   // The lowest speed
+      5,   // Te default speed
+      10   // The highest speed
+    ],
+    spawnDelay = [ // Bonus food spawn delay in milliseconds
+      5000,  // Randomness: from
+      10000, //             to
+      0,     // Fulness: 0%
+      2000,  //          100%
+      0.45   // Skill: 10
+    ],
+    modeSwitchLength = 5000,    // The length of the Dusk / Dawn switch in milliseconds
+    glowLengthRoot = 12,        // The root from which the achievement glow effects are calculated
+    scoreRoot = 13,             // The root from which the score is calculated
+    bonusFoodSpawned = null,    // A pointer to the gameField cell object of the spawned bonusFood
+    regularFoodSpawned = {      // Coordinates of the spawned regular fodder
+      position: [],
+      legendary: false
+    },
+    bonusFoodSpawnMoves,        // The number of moves to the next bonusFood spawn since the last one
+    movesCounter = 0,           // The number of moves you've made since the last bonusFood spawn
+    foodEatenAnim = false,
+    foodEatenAnimDisabled = false,
+    speedBoost = [
+      1, // Current speed boost
+      0, // Speed boost decelaration per step
+      0, // Time you've been waiting so far -
+           // 0 or currInterval / speedBoost[0] - currInterval
+      1, // Current effectiveness of the boost
+    ],
+    interval = 0, first = true, // First game true / false - Doèasné, nemìlo by být potøeba, hack!
+    maxInterval = calcInterval(speeds[2]), currInterval,
+    fieldClass = "nic", // CSS classes definition
     food = "jidlo",
-    bonusFood = "bonusjidlo",
-    superFood = "superjidlo",
+    bonusFood = "bonusJidlo",
+    superFood = "superJidlo",
+    legendFood = "legendJidlo",
     body = "telo",
     head = "hlava",
+    eatenLegendFood = false,
+    lengthMultiplier = 1, // The bigger field the more cells you get per food
+    foodGlowLength = (function() {
+      var o = {};
+          o[food] = 6;
+          o[bonusFood] = 10;
+          o[superFood] = 15;
+          o[legendFood] = 25;
+      return o;
+    })(),
+    foodSTextColors = (function() {
+      var o = {};
+          o[food] = 0;
+          o[bonusFood] = 1;
+          o[superFood] = 2;
+          o[legendFood] = 3;
+      return o;
+    })(),
+    foodGridColors = (function() {
+      var o = {};
+          o[food] = 0;
+          o[bonusFood] = 1;
+          o[superFood] = 5;
+          o[legendFood] = 6;
+      return o;
+    })(),
+    foodColorIndexes = (function() {
+      var o = {};
+          o[food] = 3;
+          o[bonusFood] = 2;
+          o[superFood] = 1;
+          o[legendFood] = 0;
+      return o;
+    })(),
+    foodScoreTextSize = (function() {
+      var o = {};
+          o[food] = 1;
+          o[bonusFood] = 1.3;
+          o[superFood] = 1.8;
+          o[legendFood] = 2.6;
+      return o;
+    })(),
+    foodScoreTextHideDelay = (function() {
+      var o = {};
+          o[food] = 0;
+          o[bonusFood] = 500;
+          o[superFood] = 1000;
+          o[legendFood] = 2000;
+      return o;
+    })(),
+    foodBonuses = (function() {
+      var o = {};
+          o[food] = 1;         // Regular Food: 1x multiplier
+          o[bonusFood]  = 3;   // Bonus Food: 3x multiplier
+          o[superFood]  = 5;   // Super Food: 5x multiplier
+          o[legendFood] = 15;  // Legendary Food: 15x multiplier
+      return o;
+    })(),
+    foodBoosts = (function() {
+      var o = {};
+          o[food] =       [2,   0.5];     // Regular Food: 2x boost, 1/2 of the field
+          o[bonusFood] =  [2.5, 3/4];     // Bonus Food: 2.5x boost, 4/3 of the field
+          o[superFood] =  [3.5, 1  ];     // Super Food: 3.5x boost, the entire field
+          o[legendFood] = [4,   4/3];     // Legendary Food: 4x boost, four thirds of the field
+      return o;
+    })(),
+    LEFT = 0,           // Direction flags
+    UP = 1,
+    RIGHT = 2,
+    DOWN = 3,
+    PAUSE = 4,          // More listeningManager flags, call with listeningManager.listener(flag)
+    SILENTPAUSE = 5,
     collisionList = [
-      body,
+      body,             // A list of all CSS collision classes
       head
-    ];
+    ],
+    speed = (function() {
+      var speed;
+      if(!storage ||
+         !(speed = Number(storage.getItem("speed"))))
+           speed = speeds[1];
+      return speed;
+    })(),
+    performMove,
+    DayTimeListener,
+    listeningManager = {
+      listener: function(result) {
+        if(result < 4 && (!paused || silentPaused)) Buffer.hit(result);
+        else if((result === PAUSE && !switchingModes) || result === SILENTPAUSE) {
+          if(!paused) {
+            if(result === PAUSE) {
+              // Doèasné
+              Cursor.Show();
+              Pause.show();
+            }
+            paused = true;
+            if(result === SILENTPAUSE) silentPaused = true;
+            (speedBoost[0] === 1 && speedBoost[1] === 0?clearInterval:clearTimeout)(interval);
+          } else {
+            // Doèasné
+            Cursor.Hide();
+            paused = false;
+            if(result === SILENTPAUSE) silentPaused = false;
+            else Pause.hide();
+            interval = (speedBoost[0] === 1 && speedBoost[1] === 0?setInterval:setTimeout)(performMove, currInterval / speedBoost[0]);
+          }
+        }
+      },
+      listening: false,
+      listen: function() {
+        if(!this.listening) {
+          listener.startListening();
+          this.listening = true;
+        }
+      },
+      stopListening: function() {
+        if(this.listening) {
+          listener.stopListening();
+          this.listening = false;
+        }
+      }
+    },
+    listener = new Listener(
+      [left,up,right,down,pause],
+      false,
+      listeningManager.listener
+    ),
+    tableStyle,         // A reference to the declared style element
+    switchingModes = false, // Is / isn't a mode switch in process
+    eaten = 0,
+    score = 0;
 
 Screen.onload = function() {
-  load(function(){
-    // Doèasné:
-    game(true);
-  });
-}
-
-function load(callback) {
+  Head = document.head || document.getElementsByTagName("head")[0];
+  Body = document.body || document.getElementsByTagName("body")[0];
   canvas = document.getElementById("canvas");
-  listener = new Listener();
-  // Browser hack - doèasné
-  if(isIE) ScrollBarWidth = getScrollBarWidth();
-  canvas.innerHTML = "";
-  callback();
-}
+  game(true);
+};
 
 function reset() {
-  width = Math.floor(Screen.clientDimensions[0] / presetLength);
-  height = Math.floor(Screen.clientDimensions[1] / presetLength);
-  width += Math.floor((width - 1) / (presetLength - 1 / width - 1));
-  height += Math.floor((height - 1) / (presetLength - 1 / height - 1));
-  if(width < minwidth || height < minheight) {
-    presetLength = Math.min((width/minwidth),(height/minheight)) * presetLength;
-    reset();
-    return;
-  }
-  maxEaten = width * height - defaultLength - 1;
-  maxInterval = calcInterval(10);
+  var calcDimensions = function() {
+    width  = Math.floor((Screen.clientDimensions[0] - 1) / (length + 1));
+    height = Math.floor((Screen.clientDimensions[1] - 1) / (length + 1));
+  }, squareRescale = function() {
+    length = Math.min(
+      -(minWidth  - Screen.clientDimensions[0] + 1) / minWidth,
+      -(minHeight - Screen.clientDimensions[1] + 1) / minHeight
+    ).floor();
+  }, applyCSS = function() {
+    var append, rules;
+    if(typeof tableStyle === "undefined") {
+      append = true;
+      tableStyle = document.createElement("style");
+      tableStyle.setAttribute("type", "text/css");
+    } else {
+      while(tableStyle.hasChildNodes()) {
+        tableStyle.removeChild(tableStyle.firstChild);
+      }
+    }
+    rules = document.createTextNode(".gameField td{width:" + length + "px;height:" + length + "px;}");
+    if(tableStyle.styleSheet)
+      tableStyle.styleSheet.cssText = rules.nodeValue;
+    else
+      tableStyle.appendChild(rules);
+    if(append === true)
+      Head.appendChild(tableStyle);
+  };
+  minWidth  = Screen.clientDimensions[0] > Screen.clientDimensions[1]?minLarger:minSmaller;
+  minHeight = Screen.clientDimensions[1] > Screen.clientDimensions[0]?minLarger:minSmaller;
+  length = presetLength;
+  squareRescale();
+  calcDimensions();
+  applyCSS();
+  drawTextMultiplier = (Math.abs(width - height) / Math.min(width, height)) * drawTextFactor + 1;
+  lengthMultiplier = (width * height - defaultLength - 1) / (maxEaten);
+  speedBoost[3] = 1 - (defaultLength + 1) / (0.75 * width * height);
   field = new gameField(width, height, fieldClass, collisionList, lifeTimeManager);
-  length = Math.min(presetLength - 1 / width - 1, presetLength - 1 / height - 1);
   if(fieldElement) canvas.removeChild(fieldElement);
-  fieldElement = field.toHTML(length, length);
-  length++;
+  fieldElement = field.toHTML();
   canvas.appendChild(fieldElement);
   fieldElement.cellSpacing = 1;
   fieldElement.style.left = Math.floor((Screen.clientDimensions[0] - fieldElement.offsetWidth) / 2) + "px";
@@ -104,159 +377,242 @@ function reset() {
       positionsCache[index[0]][index[1]] = field.getPos(index[0], index[1]);
     }
   }
-}
+};
 
 function clear() {
   paused = false;
-  bonusFoodHelper = 0;
   movesCounter = 0;
   bonusFoodSpawned = null;
+  eatenLegendFood = false;
   AchievementBonusFoodCollect = [0,0];
   AchievementSuperFoodCollect = [0,0];
   AchievementsListener.detach();
-  centerGrowDrawQueue = [];
+  centerGrowDrawQueue.length = 0;
+  scoreColorTresholds.length = 0;
+  score = 0;
+  eaten = 0;
   field.clear();
   field.movement.clearCallbacks();
+  field.lifeTimeManager.clear();
+  (speedBoost[0] === 1 && speedBoost[1] === 0?
+    clearInterval:clearTimeout)(interval);
+  listeningManager.stopListening();
+  Buffer.unregister();
+  ScalingSystem.reset();
+  speedBoost[0] = 1;
+  speedBoost[1] = speedBoost[2] = 0;
+  if(Ego.alive) Ego.destroy(true);
   if(stars.length) undrawAllStars();
-  clearInterval(interval);
-  listener.stopListening();
-}
+};
 
 function game(resetField) {
-  // Browser hack - doèasné
-  // celkovì doèasné - bude GUI
-  var speed = isIE?8:Number(prompt(l[5],5));
-  if(isNaN(speed) || speed > 10 || speed < 1) speed = 5;
-  var collision = !confirm(l[8]); focus();
-  // celkovì doèasné - bude GUI
-  var score = 0;
 
-  var scoreIncrease = function(increase) {
-    score += increase;
-    AchievementsListener.check(score);
-  }
-
-  if(resetField) {
-    reset();
-    PrepareAchievements(defaultLength, speed, ScoreAchievements, DynamicAchievementsList);
-  }
-  if(first)
-    first = false;
-  else clear();
-  AchievementsListener.attach(DynamicAchievementsList);
-  AchievementsListener.attach(StaticAchievementsList);
-
-  currInterval = calcInterval(speed);
-  Ego = new Snake(field, {
-    head: head,
-    body: body,
-    speed: speed,
-    length: defaultLength,
-    automation: {
-      movementManager: true,
-      autoSpawn: true,
-      drawStars: true
-    },
-    collision: {
-      walls: collision?1:0, // 0: Collision with a wall makes the snake appear on the other side
-                            // 1: Collision with a wall results in the snake's death
-                            // 2: Collision with a wall makes the snake go behind the wall and disappear
-      body: true,
-      items: true
-    },
-    callbacks: {
-      death: function() {
-        clearInterval(interval);
-        listener.stopListening();
-        // AchievementsListener.check("death"); - Not needed atm
-        centerDraw(3000,"#000000","#FFFFFF",length,
-          "<b>"+l[6]+"</b><span class=\"score\" style=\"font-size: " + (length*1.2) + "px\">"+(score>=1000?score.group(length*1.1):score)+"</span>"+l[7]
-        );
-      },
-      collision: function(x,y,get) {
-        switch(get) {
-          case food : {
-            FullscreenGlow(currInterval * 6,gridColors[0],0);
-            scoreIncrease(calcScore(Ego.length, Ego.speed));
-            snakeDraw([x,y],0,"#000000","#FFFFFF","score",1,score>=1000?score.group(length*0.9):score);
-            Ego.length++;
-            if(!bonusFoodSpawned && bonusFoodSpawnMoves - movesCounter >= 3000 / currInterval)
-                movesCounter += Math.round(1000 / currInterval);
-            // - 1000 ms èekání na bonus, 3 sekundy se vždy ponechají
-            field.remove(x,y);
-            Ego.move(false);
-            spawn(food);
-            AchievementsListener.check(get);
-            break;
-          }
-          case superFood :
-          case bonusFood : {
-            FullscreenGlow(currInterval * (get===superFood?15:10),gridColors[get===superFood?4:1],get===superFood?4:1);
-            var pointer = field.getElement(x,y);
-            scoreIncrease(calcScore(Ego.length, Ego.speed, get===superFood?10:3));
-            Ego.length += get===superFood?10:3;
-            bonusFoodSpawned.remove();
-            bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + defaultLength);
-            snakeDraw([x,y],1000,(get===bonusFood?"#3A7000":"#9E1DB6"),"#FFFFFF","score",get===bonusFood?1.3:1.6,score>=1000?score.group(length*(get===bonusFood?1.3:1.6)*0.9):score);
-            field.remove(x,y);
-            setOpacity(pointer, 100);
-            Ego.move(false);
-            AchievementsListener.check(get);
-            if(AchievementBonusFoodFading) AchievementBonusFoodFading = false;
-            break;
-          }
-          default: {
-          }
-        }
-      },
-      directionChange: function() {
-        AchievementsListener.check("changeDirection");
-      },/*
-      lengthChange: function(length) {
-      },*/
-      move: function() {
-        //AchievementsListener.check("move"); - Not needed atm
-        movesCounter++;
-        // For testing purposes only, displays the remaining turns to the de/spawning of the bonus food
-        // if(bonusFoodSpawned) snakeDraw(Ego.position,0,foodColors[bonusFoodSpawned.extra?0:1],"#000000","score",0.6,bonusFoodSpawned.lifetime - movesCounter === Infinity?"Anim":bonusFoodSpawned.lifetime - movesCounter);
-        // else snakeDraw(Ego.position,0,"#000000","#FFFFFF","score",0.6,bonusFoodSpawnMoves - movesCounter);
-        if(bonusFoodSpawned && movesCounter >= bonusFoodSpawned.lifetime) {
-          bonusFoodSpawned.lifetime = Infinity;
-          if(bonusFoodSpawned.extra) {
-            bonusFoodSpawned.warp();
-          } else {
-            bonusFoodSpawned.despawn();
-          }
-        }
-        if(!bonusFoodSpawned && movesCounter >= bonusFoodSpawnMoves) {
-          movesCounter = 0;
-          spawn(Math.random()<1/(superFoodChance[1] + (1 - Ego.length / (width * height)) * (superFoodChance[0] - superFoodChance[1]))?superFood:bonusFood);
-        }
-      }
-    },
-    position: [Math.round((width-1)/2), Math.round((height-1)/2)],
-    direction: Math.round(Math.random()*3)
-  });
-
-  spawn(food);
-  bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + 1);
-  maxScore = calcScore(Ego.length, Ego.speed, width*height - Ego.length);
-  interval = window.setInterval(field.movement.perform, currInterval);
-
-  listener.startListening([LEFT,UP,RIGHT,DOWN,PAUSE], function(result) {
-    if(result < 4 && !paused) Ego.changeDirection(result);
-    else if(result === 4) {
-      if(!paused) {
-        centerDraw(1000,"#000000","#FFFFFF",length,l[11]);
-        clearInterval(interval);
-        paused = true;
-      } else {
-        paused = false;
-        interval = window.setInterval(field.movement.perform, currInterval);
+  performMove = function() {
+    // Budeme potøebovat 2 promìnné
+    //  Jednu na detekci, jsme-li v poèáteèní fázi zrychlení, abychom chybnì nepoèítali s speedBoost[0] + speedBoost[1] ale jen s speedBoost[0]
+    //  V druhé bude uložen rozdíl èasù. Pakliže bude (rozdíl / speedBoost[0] + poèFáze?speedBoost[1]:0).floor() >=2, pak budeme opakovat volání metody performMove()
+    if(speedBoost[0] === 1) {
+      if(speedBoost[1] !== 0) {
+        speedBoost[1] = 0;
+        interval = setInterval(performMove, currInterval);
       }
     }
+    else {
+      interval = setTimeout(performMove, currInterval / speedBoost[0]);
+      if(speedBoost[0] > 1 + speedBoost[1])
+        speedBoost[0] -= speedBoost[1];
+      else
+        speedBoost[0] = 1;
+    }
+    field.movement.perform();
+  };
+
+  if(resetField) reset();
+  if(first) {
+    if(window.google && google.loader && google.loader.ClientLocation) {
+      DayTimeListener = new DayTime(google.loader.ClientLocation.latitude,
+                                    google.loader.ClientLocation.longitude);
+     (DayTimeListener.now === DayTime.DAY?Day:Night).Apply();
+      DayTimeListener.listen(modeSwitch);
+    } else Day.Apply();
+    GUIInit();
+  }
+
+  focus(); Menu.show(undefined, {
+    showScore: !first,
+    callback: function() {
+      if(first) first = false;
+      else clear();
+
+      maxScore = calcScore(maxEaten);
+      PrepareAchievements(speed, ScoreAchievements, DynamicAchievementsList);
+      AchievementsListener.attach(StaticAchievementsList);
+      AchievementsListener.attach(DynamicAchievementsList);
+      currInterval = calcInterval();
+      spawn(food);
+
+      Ego = new Snake(field, {
+        head: head,
+        body: body,
+        length: defaultLength,
+        automation: {
+          movement: {
+            lifeTimeManager: field.lifeTimeManager,
+            pursue: {/*
+              point: [
+                function() {
+                  return regularFoodSpawned.legendary === true?
+                         regularFoodSpawned.position:false;
+                },
+                function() {
+                  return bonusFoodSpawned !== null?
+                         bonusFoodSpawned.position:false;
+                },
+                function() {
+                  return regularFoodSpawned.position;
+                },
+                function() {
+                  return this.length === this._.length?this.history[this.history.length - 2]:this.lastCell;
+                }
+              ],
+              */method: NONE
+            }
+          },
+          autoSpawn: true,
+          drawStars: true
+        },
+        collision: {
+          walls: TRANSIT,
+          body: true,
+          items: true
+        },
+        callbacks: {
+          death: function() {
+            if(speedBoost[0] === 1 ||
+              (speedBoost[0] > 1 && speedBoost[2] === currInterval)) {
+              (speedBoost[0] === 1 && speedBoost[1] === 0?clearInterval:clearTimeout)(interval);
+              centerGrowDrawQueue.length = 0;
+              listeningManager.stopListening();
+              Buffer.unregister();
+              paused = true;
+              // Doèasné
+              Cursor.Show();
+              // AchievementsListener.check("death"); - Not needed atm
+            } else {
+              if(speedBoost[2] + currInterval / speedBoost[0] >= currInterval) {
+                speedBoost[2] = currInterval;
+                clearTimeout(interval);
+                setTimeout(performMove, currInterval - speedBoost[2]);
+              } else {
+                speedBoost[2] += currInterval / speedBoost[0];
+              }
+              // For testing purposes only
+              // console.log("CurrInterval: " + currInterval + ", SpeedBoostedCurrInterval: " + currInterval / speedBoost[0] + ", CurrentOffset: " + speedBoost[2]);
+              return false;
+            }
+          },
+          tailMiss: function() {
+            AchievementsListener.check("tailMiss");
+          },
+          afterDeath: game,
+          collision: function(x, y, get) {
+            var currBoost = speedBoost[0],
+                currBoostReductionPerMove = speedBoost[1],
+                currNumOfBoostedMoves = currBoostReductionPerMove?
+                  Math.floor((currBoost - 1) / currBoostReductionPerMove):0,
+                newBoost,
+                newBoostReductionPerMove,
+                newNumOfBoostedMoves;
+            switch(get) {
+              case food:
+              case superFood:
+              case bonusFood:
+              case legendFood:
+                FullscreenGlow(currInterval * foodGlowLength[get], gridColors[foodGridColors[get]], foodGridColors[get]);
+                score = calcScore(eaten += foodBonuses[get]);
+                this.length = defaultLength + Math.round(eaten * lengthMultiplier);
+                if(get !== food)
+                  ScalingSystem.set(SKILL);
+                AchievementsListener.check(get);
+                if(get === legendFood) {
+                  eatenLegendFood = true;
+                  regularFoodSpawned.remove();
+                } else if(get === bonusFood || get === superFood) {
+                  bonusFoodSpawned.remove();
+                  bonusFoodSpawnMoves = calcBonusFoodSpawn(this.length + 1);
+                } else {
+                  if(!bonusFoodSpawned && bonusFoodSpawnMoves - movesCounter >= 3000 / currInterval)
+                    movesCounter += Math.round(1000 / currInterval);
+                  // Mínus 1000 ms v tazích èekání na bonus pøi snìdení normálního jídla, 3 sekundy se vždy ponechají
+                }
+                snakeDraw([x,y], foodScoreTextHideDelay[get], sTextColors[foodSTextColors[get]], "score", (score >= 1000?0.9:1) * foodScoreTextSize[get], score >= 1000?score.group():score);
+                field.remove(x,y);
+                this.move(false);
+                if(get === legendFood)
+                  regularFoodSpawned.legendary = false;
+                if(get === food || get === legendFood)
+                  spawn(food);
+                if(speedBoost[3]) {
+                  (speedBoost[0] === 1 && speedBoost[1] === 0?clearInterval:clearTimeout)(interval);
+                  newBoost = foodBoosts[get][0] * speedBoost[3];
+                  newBoostReductionPerMove = (foodBoosts[get][0] - 1) / (Math.avg(width, height) * foodBoosts[get][1])
+                  newNumOfBoostedMoves = Math.floor((newBoost - 1) / newBoostReductionPerMove);
+                  if(newBoost > currBoost)
+                    speedBoost[0] = newBoost;
+                  if(newNumOfBoostedMoves >= currNumOfBoostedMoves)
+                    speedBoost[1] = newBoostReductionPerMove;
+                  else
+                    speedBoost[1] = ((newBoost > currBoost?newBoost:currBoost) - 1) / currNumOfBoostedMoves;
+                  interval = setTimeout(performMove, currInterval / speedBoost[0]);
+                }
+                break;
+            }
+            AchievementsListener.check(eaten);
+          },
+          directionChange: function() {
+            AchievementsListener.check("changeDirection");
+          },
+          lengthChange: function(length) {
+            if(speedBoost[3] !== 0) {
+              speedBoost[3] = 1 - (this.length + 1) / (0.75 * width * height);
+              if(speedBoost[3] < 0) speedBoost[3] = 0;
+            }
+          },
+          move: function() {
+            //AchievementsListener.check("move"); - Not needed atm
+            if(speedBoost[2] !== 0) speedBoost[2] = 0;
+            // For testing purposes only, displays the remaining turns to the de/spawning of the bonus food
+            // if(bonusFoodSpawned) snakeDraw(Ego.position,0,sTextColors[bonusFoodSpawned.extra?2:1],"score",0.6,bonusFoodSpawned.lifetime - movesCounter === Infinity?"Anim":bonusFoodSpawned.lifetime - movesCounter);
+            // else snakeDraw(Ego.position,0,sTextColors[0],"score",0.6,bonusFoodSpawnMoves - movesCounter);
+            if(bonusFoodSpawned && movesCounter >= bonusFoodSpawned.lifetime) {
+              bonusFoodSpawned.lifetime = Infinity;
+              if(bonusFoodSpawned.extra) {
+                bonusFoodSpawned.warp();
+              } else {
+                bonusFoodSpawned.despawn();
+              }
+            }
+            if(!bonusFoodSpawned && movesCounter >= bonusFoodSpawnMoves) {
+              spawn(toss(superFoodChance[3]())?superFood:bonusFood);
+              // For testing purposes only
+              // console.log("Epic food spawn chance: " + (100 * superFoodChance[3]()) + "%");
+            }
+          }
+        },
+        position: [Math.round((width-1)/2), Math.round((height-1)/2)],
+        direction: Math.round(Math.random()*3)
+      });
+      field.movement.addCallback(function(){
+        movesCounter++;
+      });
+      Cursor.Hide();
+      bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + 1);
+      interval = setInterval(performMove, currInterval);
+      Buffer.register(Ego);
+      listeningManager.listen();
+    }
   });
-}
+};
 
 function gameField(width, height, fieldClass, collisionList, manager) {
   var field = [],
@@ -265,7 +621,7 @@ function gameField(width, height, fieldClass, collisionList, manager) {
       lifeTimeManager = this.lifeTimeManager = new manager();
   this.collisionList = collisionList;
   this.isFull = false;
-  this.toHTML = function(tdWidth, tdHeight) {
+  this.toHTML = function() {
     var table = document.createElement("table"),
         tbody = document.createElement("tbody"),
         tr, td;
@@ -274,8 +630,6 @@ function gameField(width, height, fieldClass, collisionList, manager) {
       tr = document.createElement("tr");
       for(var count2 = 0; count2 < width; count2++) {
         td = document.createElement("td");
-        if(tdWidth) td.style.width = tdWidth + "px";
-        if(tdHeight) td.style.height = tdHeight + "px";
         if(field[count] && field[count][count2]) td.className = field[count][count2];
         else td.className = fieldClass;
         tr.appendChild(td);
@@ -285,9 +639,8 @@ function gameField(width, height, fieldClass, collisionList, manager) {
       tbody.appendChild(tr);
     }
     table.appendChild(tbody);
-    pointer = table;
     return table;
-  }
+  };
   this.spawn = function(x, y, what, lifeTime) {
     if(typeof lifeTime === "number")
       lifeTimeManager.set(x, y, lifeTime);
@@ -302,7 +655,7 @@ function gameField(width, height, fieldClass, collisionList, manager) {
     field[x][y] = what;
     if(HTMLfield[x] && HTMLfield[x][y]) HTMLfield[x][y].className = what;
     if(changes && this.getFree().length === 0 && !this.isFull) this.isFull = true;
-  }
+  };
   this.copy = function(x, y, x2, y2, lifeTime) {
     if(typeof lifeTime === "number")
       lifeTimeManager.set(x2, y2, lifeTime);
@@ -318,7 +671,7 @@ function gameField(width, height, fieldClass, collisionList, manager) {
     field[x2][y2] = field[x][y];
     if(HTMLfield[x2] && HTMLfield[x2][y2]) HTMLfield[x2][y2].className = field[x][y];
     if(changes && this.getFree().length === 0 && !this.isFull) this.isFull = true;
-  }
+  };
   this.move = function(x, y, x2, y2, lifeTime) {
     if(typeof lifeTime === "number") {
       lifeTimeManager.remove(x, y, lifeTime);
@@ -339,14 +692,14 @@ function gameField(width, height, fieldClass, collisionList, manager) {
     if(HTMLfield[x2] && HTMLfield[x2][y2]) HTMLfield[x2][y2].className = field[x][y];
     field[x][y] = null;
     if(HTMLfield[x] && HTMLfield[x][y]) HTMLfield[x][y].className = fieldClass;
-  }
+  };
   this.remove = function(x, y) {
     if(!field[x]) field[x] = [];
     if(this.isFull) this.isFull = false;
     field[x][y] = null;
     if(HTMLfield[x] && HTMLfield[x][y]) HTMLfield[x][y].className = fieldClass;
     lifeTimeManager.remove(x, y);
-  }
+  };
   this.clear = function() {
     field = []; Objectfield = [];
     if(this.isFull) this.isFull = false;
@@ -357,25 +710,25 @@ function gameField(width, height, fieldClass, collisionList, manager) {
       }
     }
     lifeTimeManager.clear();
-  }
+  };
   this.get = function(x,y) {
     return field[x] && field[x][y]?field[x][y]:false;
-  }
+  };
   this.getElement = function(x,y) {
     return HTMLfield[x] && HTMLfield[x][y]?HTMLfield[x][y]:false;
-  }
+  };
   this.getObject = function(x,y) {
     if(!Objectfield[x]) Objectfield[x] = [];
     if(!Objectfield[x][y]) Objectfield[x][y] = {};
     return Objectfield[x][y];
-  }
+  };
   this.clearObject = function(x,y) {
     if(!Objectfield[x] || !Objectfield[x][y]) return false;
     for(var z in Objectfield[x][y]) {
       delete Objectfield[x][y][z];
     }
     return true;
-  }
+  };
   this.getFree = function() {
     var places = [],
     count, count2;
@@ -391,51 +744,50 @@ function gameField(width, height, fieldClass, collisionList, manager) {
       }
     }
     return places;
-  }
+  };
   this.getPos = function(x,y) {
     if(!HTMLfield[x] || !HTMLfield[x][y]) return false;
-    var pos = findPos(HTMLfield[x][y]);
-    if(pos[0] > Screen.clientDimensions[0]) pos[0] -= HTMLfield[x][y].offsetWidth;
+    var pos = getPos(HTMLfield[x][y]);
     pos[1] += (HTMLfield[x][y].offsetHeight - length) - HTMLfield[x][y].offsetHeight / 2;
     return pos;
-  }
+  };
 
-  /* For testing purposes only
-  var temp = lifeTimeManager.decrease, that = this;
-  lifeTimeManager.decrease = function() {
-    temp();
-    HTMLfield.each(function(subfield, x) {
-      subfield.each(function(td, y) {
-        td.style.fontSize = "small";
-        td.style.textAlign = "center";
-        if(td.className === "hlava")
-          td.style.color = "white";
-        else
-          td.style.color = "black";
-        td.innerHTML = lifeTimeManager.get(x, y);
-      });
-    });
-  } */
-
-  var callbacks = [];
+  var callbacks = [],
+      FCCallbacks = [];
   this.movement = {
-    addCallback: function(callback) {
-      callbacks.push(callback);
+    addCallback: function(obj) {
+      callbacks.push(obj);
     },
-    removeCallback: function(callback) {
-      callbacks.remove(callbacks.indexOf(callback));
+    addFCCallback: function(obj) {
+      FCCallbacks.push(obj);
+    },
+    removeCallback: function(obj) {
+      var index = callbacks.indexOf(obj);
+      if(index !== -1) callbacks.remove(index);
+    },
+    removeFCCallback: function(obj) {
+      var index = FCCallbacks.indexOf(obj);
+      if(index !== -1)
+        FCCallbacks.remove(index);
     },
     clearCallbacks: function() {
       callbacks.length = 0;
     },
     perform: function() {
-      callbacks.each(function(callback) {
-        callback();
+      FCCallbacks.each(function(obj) {
+        if(!obj) return false;
+        else if(obj instanceof Function) obj();
+        else obj.callback.call(obj.context);
       });
       lifeTimeManager.decrease();
+      callbacks.each(function(obj) {
+        if(!obj) return false;
+        else if(obj instanceof Function) obj();
+        else obj.callback.call(obj.context);
+      });
     }
   };
-}
+};
 
 function lifeTimeManager() {
   if(!(this instanceof lifeTimeManager)) return;
@@ -450,21 +802,33 @@ function lifeTimeManager() {
       container[count][count2] = 0;
     }
   }
+
   this.destroy = function() {
     lifeTimeManager.array.remove(
       lifeTimeManager.array.indexOf(this)
     );
   }
+
   this.get = function(x, y) {
     if(!container[x] || typeof container[x][y] != "number")
       return 0;
     return container[x][y];
   }
+
+  this.getArray = function(x, y) {
+    var New = [];
+    container.each(function(e){
+      New.push(e.slice(0));
+    });
+    return New;
+  }
+
   this.set = function(x, y, value) {
     if(!container[x] || typeof container[x][y] != "number" || container[x][y] >= value)
       return false;
     return container[x][y] = value;
   }
+
   this.decrease = function() {
     for(var count = 0; count < width; count++) {
       for(var count2 = 0; count2 < height; count2++) {
@@ -473,6 +837,7 @@ function lifeTimeManager() {
       }
     }
   }
+
   this.clear = function() {
     for(var count = 0; count < width; count++) {
       for(var count2 = 0; count2 < height; count2++) {
@@ -481,59 +846,56 @@ function lifeTimeManager() {
       }
     }
   }
+
   this.remove = function(x, y) {
     if(!container[x] || typeof container[x][y] != "number")
       return;
     if(container[x][y])
       container[x][y] = 0;
   }
-}
+};
+
 lifeTimeManager.globalDecrease = function() {
   if(!this.array) return;
   this.array.each(function(field) {
     field.decrease();
   });
-}
+};
+
 lifeTimeManager.globalClear = function() {
   if(!this.array) return;
   this.array.each(function(field) {
     field.clear();
   });
-}
+};
+
 lifeTimeManager.globalRemove = function(x, y) {
   if(!this.array) return;
   this.array.each(function(field) {
     field.remove(x, y);
   });
-}
+};
+
 lifeTimeManager.globalDestroy = function() {
   if(!this.array) return;
   this.array.length = 0;
-}
+};
 
-function PrepareAchievements(snakeLength, speed, data, outputArray) {
+function PrepareAchievements(speed, data, outputArray) {
   // Parse and consolidate the Dynamic Data
-  var result = [], adopt = [], index = [], offsetArray, match, maxEaten = width * height - snakeLength, topEaten = 0, dynamicAmount = 0, minDynamicOffset = [0,0,0];
+  var result = [], adopt = [], dynamicAmount = 0, dynamicIndex = 1;
   data.each(function(data) {
-    if(data.treshold && data.treshold.type === "eaten") {
-      minDynamicOffset[0]++;
-      minDynamicOffset[1] += data.treshold.amount - minDynamicOffset[2];
-      minDynamicOffset[2] = data.treshold.amount;
-      if(data.treshold.amount > topEaten)
-        topEaten = data.treshold.amount;
-    }
+    var index = 0;
     if(data.text instanceof Array) {
-      for(index[0] = data.text[1]; index[0] <= data.text[2]; index[0]++) {
-        if(!data.treshold) dynamicAmount++;
-        (data.colors === "adopt" ||
-         data.sizeMultiplier === "adopt" ||
-         data.delay === "adopt"?adopt:result).push({
-          text: data.text[0][index[0]],
+      for(index = data.text[1]; index <= data.text[2]; index++) {
+        dynamicAmount++;
+        result.push({
+          text: data.text[0][index],
           colors: data.colors,
           sizeMultiplier: data.sizeMultiplier,
           delay: data.delay,
-          score: data.treshold?(data.treshold.type === "score"?
-                 data.treshold.amount:calcScore(snakeLength, speed, data.treshold.amount)):"$"
+          score: "$",
+          first: index === data.text[1]
         });
       }
     } else {
@@ -546,18 +908,28 @@ function PrepareAchievements(snakeLength, speed, data, outputArray) {
           sizeMultiplier: data.sizeMultiplier,
           delay: data.delay,
           score: data.treshold?(data.treshold.type === "score"?
-                  data.treshold.amount:calcScore(snakeLength, speed, data.treshold.amount)):"$"
+                 findScore(data.treshold.amount):
+                 data.treshold.amount):"$$"
         });
     }
   });
-  minDynamicOffset = minDynamicOffset[1] / minDynamicOffset[0];
+
+  result.each(function(result, index) {
+    if(result.score === "$") {
+      result.score = dynamicIndex++ * maxEaten / dynamicAmount;
+      if(result.first) scoreColorTresholds.push(calcScore(result.score));
+    } else if(result.score === "$$") {
+      result.score = dynamicIndex++ * maxEaten / dynamicAmount;
+      adopt.push(result);
+      this.remove(index);
+    }
+  });
+
   adopt.each(function(adopt) {
-    offsetArray = [];
+    var offsetArray = [];
     result.each(function(result) {
       if(typeof result.score === "number")
         offsetArray.push(Math.abs(result.score - adopt.score));
-      else
-        offsetArray.push(Infinity);
     });
     match = offsetArray.indexOf(Math.min.apply(Math, offsetArray));
     if(match < result.length - 2) match++; // We round the index of the array we're gonna adopt to up unless we are dealing with the top evaluation
@@ -569,17 +941,7 @@ function PrepareAchievements(snakeLength, speed, data, outputArray) {
       adopt.delay = result[match].delay;
     result.push(adopt);
   });
-  for(index[0] = 0, index[1] = 1; index[0] < result.length; ) {
-    if(result[index[0]].score === "$") {
-      if((maxEaten - topEaten) / dynamicAmount > minDynamicOffset) {
-        result[index[0]].score = calcScore(snakeLength, speed, topEaten + (maxEaten - topEaten) / dynamicAmount * index[1]);
-        index[0]++; index[1]++;
-      } else {
-        result.remove(index[0]);
-        dynamicAmount--;
-      }
-    } else index[0]++;
-  }
+
   // Create an array of objects fit for the Achievements class
   if(outputArray.length > 0) outputArray.length = 0;
   result.each(function(field) {
@@ -595,231 +957,163 @@ function PrepareAchievements(snakeLength, speed, data, outputArray) {
         centerGrowDraw(
           500,
           field.delay,
-          textColors[field.colors][0],
-          textColors[field.colors][1],
-          textColors[field.colors][2],
-          textColors[field.colors][3],
+          textColors[field.colors],
           length / 2,
           length * field.sizeMultiplier,
           field.text
         );
         FullscreenGlow(
-          currInterval * 12,
-          gridColors[field.colors < 6?field.colors + 1:field.colors],
-          1
+          currInterval * glowLengthRoot * field.delay / 2000,
+          gridColors[field.colors + (field.colors === 3?2:1)],
+                     field.colors + (field.colors === 3?2:1)
         );
       }
     });
   });
 };
 
-function Snake(field, opts) {
-  if(!(field instanceof gameField) ||
-     typeof opts != "object" ||
-     !opts.head ||
-     !opts.body ||
-     opts.speed < 1 ||
-     opts.speed > 10 ||
-     opts.length <= 0 ||
-     !(opts.position instanceof Array) ||
-     opts.direction > 3 ||
-     opts.direction < 0
-  ) return;
-  this.head = opts.head;
-  this.body = opts.body;
-  this.speed = opts.speed;
-  this.length = opts.length;
-  this.AI = opts.automation;
-  this.callbacks = typeof opts.callbacks === "object"?opts.callbacks:{};
-  if(this.AI.movementManager || this.AI.drawStars) {
-    var formerDeathCallback = this.callbacks.death,
-      deathCallback = function() {
-        if(that.AI.movementManager)
-          field.movement.removeCallback(moveScript);
-        if(that.AI.drawStars)
-          drawStars(that.position);
-      };
-      this.callbacks.death = function() {
-        deathCallback();
-        if(typeof formerDeathCallback === "function")
-          formerDeathCallback();
-      }
-  }
-  else
-    this.callbacks = {};
-  if(typeof opts.collision === "object")
-    this.collision = opts.collision;
-  else
-    this.collision = {
-      walls: 1,
-      body: true,
-      items: true
-    };
-  this.position = opts.position;
-  this.direction = opts.direction;
-  var newdirection = false, interval, length, that = this,
-  lastCell = function(x,y) {
-    return (length === that.length && x === that.history[Ego.history.length-1][0] && y === that.history[Ego.history.length-1][1]);
-  }
-  this.spawn = function() {
-    this.history = [];
-    var x = this.position[0];
-    var y = this.position[1];
-    if(field.get(x,y) === food) spawn(food);
-    field.spawn(x, y, this.head, this.length);
-    for(var count = 0; count < this.length; count++) {
-      if(this.direction === 0) x++;
-      if(this.direction === 1) y++;
-      if(this.direction === 2) x--;
-      if(this.direction === 3) y--;
-      if(field.get(x, y) === food) spawn(food);
-      field.spawn(x, y, this.body, this.length - 1 - count);
-      this.history[count] = [x,y];
-    }
-    length = this.length;
-    if(this.AI.movementManager)
-      field.movement.addCallback(moveScript);
-  }
-  this.changeDirection = function(direction) {
-    var changed = false;
-    if(this.direction === 0 && direction != 0 && direction != 2 && (changed = true)) newdirection = direction;
-    else if(this.direction === 1 && direction != 1 && direction != 3 && (changed = true)) newdirection = direction;
-    else if(this.direction === 2 && direction != 0 && direction != 2 && (changed = true)) newdirection = direction;
-    else if(this.direction === 3 && direction != 1 && direction != 3 && (changed = true)) newdirection = direction;
-    if(direction === newdirection &&
-       changed === true &&
-       typeof this.callbacks.directionChange === "function")
-        this.callbacks.directionChange(newdirection);
-  }
-  this.move = function(callback) {
-    if(newdirection !== false) {
-      this.direction = newdirection;
-      newdirection = false;
-    }
-    var x = this.position[0];
-    var y = this.position[1];
-    if(this.direction === 0) x--;
-    if(this.direction === 1) y--;
-    if(this.direction === 2) x++;
-    if(this.direction === 3) y++;
-    if((x < 0 || x >= width || y < 0 || y >= height) && !this.collision.walls) {
-      if(x < 0) x = width - 1;
-      if(x >= width) x = 0;
-      if(y < 0) y = height - 1;
-      if(y >= height) y = 0;
-    }
-    var get = field.get(x,y);
-    var last = get?lastCell(x, y):false;
-    if(get && !last && get === this.body && this.collision.body) {
-      if(this.callbacks.death) this.callbacks.death();
-    } else if(get && !last && get != this.body && this.collision.items) {
-      if(field.collisionList.indexOf(get) > -1) {
-        if(this.callbacks.death) this.callbacks.death();
-      } else
-        if(this.callbacks.collision) this.callbacks.collision(x, y, get);
-    } else if((x < 0 || x >= width || y < 0 || y >= height) && this.collision.walls === 1) {
-      if(this.callbacks.death) this.callbacks.death();
-    } else {
-      var increaseSize = false;
-      if(length != this.length) {
-        increaseSize = true;
-        length++;
-        if(this.callbacks.lengthChange) this.callbacks.lengthChange(length);
-      }
-      this.history.unshift(this.position.slice(0));
-      if(this.collision.body) {
-        field.spawn(x, y, this.head, this.length + 1);
-        // Non-strict redrawing
-        if(this.position[0] >= 0 &&
-           this.position[0] < width &&
-           this.position[1] >= 0 &&
-           this.position[1] < height)
-          field.spawn(this.position[0], this.position[1], this.body);
-          if(!increaseSize && !(
-            this.history[this.history.length - 1][0] === x &&
-            this.history[this.history.length - 1][1] === y
-          )) field.remove(this.history[this.history.length - 1][0], this.history[this.history.length - 1][1]);
-        // Refreshing the lifeTimeManager values
-        if(increaseSize) {
-          this.history.each(function(position, index) {
-            field.lifeTimeManager.set(position[0], position[1],
-                                      that.length - index);
-          });
-        }
-      }
-      this.position = [x, y];
-      if(!this.collision.body) {
-        last = true;
-        // Too strict, not needed unless the snake can go through its own body
-        this.history.each(function(history, index) {
-          if(history[0] >= 0 &&
-             history[0] < width &&
-             history[1] >= 0 &&
-             history[1] < height) {
-            if(index < that.history.length - 1) {
-              if(history[0] === that.history[that.history.length - 1][0] &&
-                 history[1] === that.history[that.history.length - 1][1])
-              last = false;
-              field.spawn(history[0], history[1], that.body,
-                          increaseSize?that.length - index:undefined);
+function modeSwitch(mode) {
+  if(switchingModes) return;
+  if(Graphics.ModeSwitchAnimation === false)
+    return (mode === DayTime.DUSK?Night:Day).Apply();
+  var count = 0, counter = function() {
+        if(++count === 3) mSwitch();
+      }, mSwitch = function() {
+        Skin.Transition(
+          mode === DayTime.DAWN?Night:Day,
+          mode === DayTime.DUSK?Night:Day,
+          modeSwitchLength,
+          function() {
+            foodEatenAnimDisabled = false;
+            centerGlowDisabled.enable();
+            if(keyListenerListening) {
+              if(silentPaused)
+                listeningManager.listener(SILENTPAUSE);
+              listeningManager.listen();
             }
-            else if(last && !increaseSize && !(
-                    that.history[that.history.length - 1][0] === x &&
-                    that.history[that.history.length - 1][1] === y
-                  )) field.remove(history[0], history[1]);
+            openGUIs.each(function(GUI) {
+              GUI.show();
+            });
+            focus();
+            switchingModes = false;
           }
-        });
-      }
-      if(!increaseSize) this.history.pop();
-      if(!this.collision.body)
-        field.spawn(x, y, this.head, this.length + 1);
-      if(callback && this.callbacks.move) this.callbacks.move();
-    }
-  }
-  if(this.AI.movementManager)
-    var moveScript = function() {
-      that.move(true);
-    }
-  if(this.AI.autoSpawn)
-    that.spawn();
-}
+        );
+      }, openGUIs = [], openGUIsLength,
+      keyListenerListening = listeningManager.listening;
 
-function calcInterval(speed) { /* Obsolete and rather hacky code
-  return Math.round(((800 - ((9-(speed-1))*(800/10))) * ((Math.min(width,height)-Math.min(minheight,minwidth)>0?Math.min(width,height)-Math.min(minheight,minwidth):0) / 20) // Zpomalení pro vìtší hrací pole, Math.min(minheight,minwidth) políèek: 0 sekund, pak 800 - 800/6 (10 - 1 speed) ms po 20 políèkách
+  switchingModes = true;
+  GUI.instances.each(function(GUInst) {
+    if(GUInst.status !== GUI.HIDDEN)
+       openGUIs.push(GUInst);
+  });
+  openGUIsLength = openGUIs.length;
+
+  if(keyListenerListening) {
+    if(!paused)
+      listeningManager.listener(SILENTPAUSE);
+    Buffer.clear();
+  }
+
+  (mode === DayTime.DAWN?Day:Night).ApplyTextVariables();
+  foodEatenAnimDisabled = true;
+  centerGlowDisabled.disabled = true;
+
+  if(openGUIsLength) GUI.hide(counter);
+  else count++;
+
+  if(centerGlowEngaged)
+    centerGrowDrawQueue.callback = counter;
+  else count++;
+
+  if(foodEatenAnim)
+    foodEatenAnim.callback = counter;
+  else count++;
+
+  if(count === 3) mSwitch();
+};
+
+/*function changeSpeed(newSpeed) {
+  if(newSpeed === speed) return;
+  var setBoost = false;
+  if(speedBoost[0] !== 1 || speedBoost[1] !== 0) {
+    setBoost = true;
+    speedBoost[0] = 1;
+    speedBoost[1] = 0;
+    clearTimeout(interval);
+  } else {
+    clearInterval(interval);
+  }
+  speed = newSpeed;
+  currInterval = calcInterval();
+  if(setBoost) interval = setTimeout (performMove, currInterval / speedBoost[0]);
+  else         interval = setInterval(performMove, currInterval);
+};*/
+
+function calcInterval(passedSpeed) { /* Obsolete and rather hacky code
+  return Math.round(((800 - ((9-(speed-1))*(800/10))) * ((Math.min(width,height)-Math.min(minHeight,minWidth)>0?Math.min(width,height)-Math.min(minHeight,minWidth):0) / 20) // Zpomalení pro vìtší hrací pole, Math.min(minHeight,minWidth) políèek: 0 sekund, pak 800 - 800/6 (10 - 1 speed) ms po 20 políèkách
     + (11 - speed) * 1000) / ((width+height) / 2)); // 8 sekund na pøejetí prùmìru kratší a delší strany pøi nejpomalejším módu, 1 pøi nejrychlejším
   */
-  return (5000 - (speed - 1) * (4450 / 9)) / ((minwidth + minheight) / 2);
-  // 5 sekund na pøejetí prùmìru kratší a delší strany pøi nejpomalejším módu, 550ms pøi nejrychlejším
-}
+  return (6000 - ((passedSpeed || speed) - 1) * (5000 / (speeds[2] - speeds[0]))) / scoreCalcAvg;
+  // 6 sekund na pøejetí prùmìru kratší a delší strany pøi nejpomalejším módu, 1 sekunda pøi nejrychlejším
+  // Nepoužíváme skuteènou velikost stìn, ale konstantní prùmìr 27.5, vychází z velikostí stìn 30 a 25 a tyto rychlosti se osvìdèily
+};
 
-function calcScore(length, speed, multi) {
-  if(multi) { // If we wanna add a multiplication of some score, but don't wanna lose the per-length bonus
-    if(multi > (width * height) - (length + 1))
-      multi = (width * height) - (length + 1);
-    for(var score = 0; multi > 0; multi--) {
-      score += Math.round((1 + (speed-1) * 4/9) // 1 - 5x bonus za rychlost
-      //* (1 + 2*((length + 1) / (width * height))) - 1 - 3x bonus za zaplnìní plochy (3x pokud zabírá had veškerá pole) - DISABLED
-      * (length + 1) / 3); // Základní bodování - 1 bod za každá 3 políèka délky hada
-      length++;
-    }
-    return score;
-  } else {
-    if((width * height) - (length + 1) >= 1)
-      return Math.round((1 + (speed-1) * 4/9) // 1 - 5x bonus za rychlost
-      //* (1 + 2*((length + 1) / (width * height))) -  1 - 3x bonus za zaplnìní plochy (3x pokud zabírá had veškerá pole) - DISABLED
-        * (length + 1) / 3); // Základní bodování - 1 bod za každá 3 políèka délky hada
-    else return 0;
-  }
-}
+/*
 
-function calcDistance(loc, tar, collision) {
+  a = (l + (b - k) * (i - l) / j) * (m + c / (d * e - f - m) * h) * c * g
+  c = -((e * d - f - m) * (-j * Math.sqrt(g.pow() * m.pow() * (((b - k) * (i - l)) / j + l).pow() + (4 * a * g * h * (((b - k) * (i - l)) / j + l)) / (e * d - f - m)) + b * g * m * i + g * j * l * m + g * k * l * m - b * g * l * m - g * k * m * i)) / (2 * g * h * (b * i - k * i + j * l + k * l - b * l))
+
+  a = score
+  b = speed
+  c = eaten
+  d = minWidth
+  e = minHeight
+  f = defaultLength
+  g = scoreRoot
+  h = 2
+  i = speedBonus[1]
+  j = (speeds[1] - speeds[0])
+  k = 1
+  l = speedBonus[0]
+  m = 1
+
+*/
+
+function calcScore(eaten) {
+  if(eaten > maxEaten)
+    eaten = maxEaten;
+
+  return Math.floor((speedBonus[0] + (speed - 1) * (speedBonus[1] - speedBonus[0])/(speeds[2] - speeds[0])) *      // za rychlost *
+                    (1 + eaten / (maxEaten) * 2) *                                 // za zaplnìní *
+                     eaten * scoreRoot);                                                                           // koøen
+};
+
+function findScore(score) {
+  var a = score,
+      b = speed,
+      c = eaten,
+      d = minWidth,
+      e = minHeight,
+      f = defaultLength,
+      g = scoreRoot,
+      h = 2,
+      i = speedBonus[1],
+      j = speeds[2] - speeds[0],
+      k = 1,
+      l = speedBonus[0],
+      m = 1;
+  return Math.ceil(-((e * d - f - m) * (-j * Math.sqrt(g.pow() * m.pow() * (((b - k) *
+                  (i - l)) / j + l).pow() + (4 * a * g * h * (((b - k) * (i - l)) / j + l))
+                  / (e * d - f - m)) + b * g * m * i + g * j * l * m + g * k * l * m - b *
+                  g * l * m - g * k * m * i)) / (2 * g * h * (b * i - k * i + j * l + k * l - b * l)));
+};
+
+function calcDistance(location, target, collision) {
   var distX, distY;
-  if(!collision) {
-    var middle = [];
-    loc = loc.slice(0);
-    tar = tar.slice(0);
-    var loc2 = loc.slice(0);
-    var tar2 = tar.slice(0);
+  if(collision === false) {
+    var middle = [],
+        loc = location.slice(0),
+        tar = target.slice(0);
     if(width/2 & 1) {
       middle[0] = Math.floor(width/2);
       middle[1] = Math.floor(height/2);
@@ -835,47 +1129,63 @@ function calcDistance(loc, tar, collision) {
       if(loc[1] > middle[1]) loc[1] = middle[1] - (loc[1] - middle[1]) + 1;
       if(tar[1] > middle[1]) tar[1] = middle[1] - (tar[1] - middle[1]) + 1;
     }
-    distX = Math.min(loc[0] + tar[0], Math.abs(loc2[0] - tar2[0]));
-    distY = Math.min(loc[1] + tar[1], Math.abs(loc2[1] - tar2[1]));
-    //alert("X dist: " + distX + "\nY dist: " + distY + "\ntar, loc: " + tar.join(", ") + " - " + loc.join(", ") + "\ntar2, loc2: " + tar2.join(", ") + " - " + loc2.join(", "));
+    distX = Math.min(loc[0] + tar[0], Math.abs(location[0] - target[0]));
+    distY = Math.min(loc[1] + tar[1], Math.abs(location[1] - target[1]));
   } else {
     distX = Math.abs(loc[0] - tar[0]);
     distY = Math.abs(loc[1] - tar[1]);
-    //alert("X dist: " + distX + "\nY dist: " + distY);
   }
   return distX + distY;
-}
+};
 
 function calcBonusFoodSpawn(length) {
-  return Math.round((0.45 + (10-bonusFoodHelper)*0.055) * (6000+Math.random()*10000) / maxInterval);
-  // 6000 - 16000 ms (2700 - 7200 pokud je helper plný) v tazích (poèítá se z intervalu na tah podle maximální rychlosti)
-}
+  return Math.round((
+           (1 - ((1 - spawnDelay[4]) * ScalingSystem.get().abs() / 10)) *
+           ((spawnDelay[0] + Math.random() * (spawnDelay[1] - spawnDelay[0])) +
+           (spawnDelay[2] + (1 - length / maxEaten) * spawnDelay[3]))
+         ) / maxInterval);
+};
 
-function FullscreenGlow(duration,color,importance) {
-  if(ChangingColor && FullscreenEffects && ((foodEatenAnim && (importance > foodEatenAnim.importance || (importance === foodEatenAnim.importance && color === foodEatenAnim.color))) || !foodEatenAnim)) {
+function FullscreenGlow(duration, color, importance) {
+  if(!foodEatenAnimDisabled && Graphics.ChangingColor && Graphics.FullscreenEffects &&
+    ((foodEatenAnim && (importance > foodEatenAnim.importance ||
+      (importance === foodEatenAnim.importance && color === foodEatenAnim.color)))
+      || !foodEatenAnim)) {
     var count = 0;
     if(foodEatenAnim) {
       foodEatenAnim.anim[0]();
       foodEatenAnim.anim[1]();
     }
     foodEatenAnim = {
-      "importance":importance,
-      "color":color,
-      anim: [recolor(duration,color[0],originalGridColor,function(color) {
-        fieldElement.style.backgroundColor = color;
-      }, function() {
-        count++;
-        if(count === 2) foodEatenAnim = false;
-      }),
-      recolor(duration,color[1],originalBackgroundColor,function(color) {
-        (document.body || document.documentElement).style.backgroundColor = color;
-      }, function() {
-        count++;
-        if(count === 2) foodEatenAnim = false;
-      })]
+      "importance": importance,
+      "color": color,
+      "anim": [
+        recolor(duration, color[0], originalGridColor, function(color) {
+          fieldElement.style.backgroundColor = color;
+        }, function() {
+          fieldElement.style.backgroundColor = "";
+          count++;
+          if(count === 2) {
+            if(foodEatenAnim.callback instanceof Function)
+              foodEatenAnim.callback();
+            foodEatenAnim = false;
+          }
+        }),
+        recolor(duration,color[1],originalBackgroundColor,function(color) {
+          Body.style.backgroundColor = color;
+        }, function() {
+          Body.style.backgroundColor = "";
+          count++;
+          if(count === 2) {
+            if(foodEatenAnim.callback instanceof Function)
+              foodEatenAnim.callback();
+            foodEatenAnim = false;
+          }
+        })
+      ]
     }
   }
-}
+};
 
 function drawStars(position) {
   position = positionsCache[position[0]][position[1]];
@@ -883,17 +1193,17 @@ function drawStars(position) {
   var innerElement = document.createElement("span");
   innerElement.style.position = "relative";
   innerElement.style.height = innerElement.style.width = length + "px";
-  var eclipse = calculateEllipse(true, length / 2, length / 2, length / 2, length / 6, 0, FramesPerSecond);
-  var index = [];
+  var eclipse = calculateEllipse(true, length / 2, length / 2, length / 2, length / 6, 0, Graphics.FramesPerSecond),
+      index = [], last, node = new Image();
+  node.src = starsImage[SVGSupport?1:0];
+  node.style.width = node.style.height = (length/3) + "px";
+  node.style.position = "absolute";
   for(var count = 1; count <= starsNumber; count++) {
     if(count === starsNumber) index.push(eclipse.length-1);
     else index.push(Math.round((eclipse.length-1)/starsNumber*count));
-    stars.push(document.createElement("img"));
-    stars[stars.length-1].src = starsImage;
-    stars[stars.length-1].style.width = stars[stars.length-1].style.height = (length/3) + "px";
-    stars[stars.length-1].style.position = "absolute";
-    stars[stars.length-1].style.left = (eclipse[index[stars.length-1]][0] - (eclipse[index[stars.length-1]][0]/length)*length/3) + "px"; // Smrštìní se na velikost jednoho pole
-    stars[stars.length-1].style.top = eclipse[index[stars.length-1]][1] + (length/2) - (length/6) + "px";
+    last = stars.push(node.cloneNode(false)) - 1;
+    stars[last].style.left = (eclipse[index[stars.length-1]][0] - (eclipse[index[stars.length-1]][0]/length)*length/3) + "px"; // Smrštìní se na velikost jednoho pole
+    stars[last].style.top = eclipse[index[stars.length-1]][1] + (length/2) - (length/6) + "px";
     innerElement.appendChild(stars[stars.length-1]);
   }
   starsSpans.push(document.createElement("span"));
@@ -908,8 +1218,8 @@ function drawStars(position) {
       stars[count].style.left = (eclipse[index[count]][0] - (eclipse[index[count]][0]/length)*length/3) + "px"; // Smrštìní se na velikost jednoho pole
       stars[count].style.top = (eclipse[index[count]][1] + (length/2) - (length/6)) + "px";
     }
-  },1000 / FramesPerSecond));
-}
+  },1000 / Graphics.FramesPerSecond));
+};
 
 function undrawStars(index) {
   if(index > starsSpans.length-1) return false;
@@ -918,7 +1228,7 @@ function undrawStars(index) {
   stars.splice(index,1);
   starsAnim.splice(index,1);
   return true;
-}
+};
 
 function undrawAllStars() {
   if(starsSpans.length === 0) return false;
@@ -930,110 +1240,148 @@ function undrawAllStars() {
     starsSpans.splice(index, 1);
   });
   return true;
-}
+};
 
-function snakeDraw(position,delay,textColor,shadowColor,className,sizeMultiplier,text) {
+function snakeDraw(position,delay,colors,className,sizeMultiplier,text) {
   if(delay <= 0) delay = 1;
-  var timeout = [];
-  var x = position[0];
-  var y = position[1];
+  var timeout = [],
+      x = position[0],
+      y = position[1],
+      textColor = colors[0],
+      shadowColor = colors[1];
   position = positionsCache[x][y];
   position = [(isNaN(Math.round(position[0]))?0:Math.round(position[0])), (isNaN(Math.round(position[1]))?0:Math.round(position[1]))];
   var score = document.createElement("div");
   score.className = className?"absolutePositionedText snakeDraw " + className:"absolutePositionedText snakeDraw";
   score.style.color = textColor;
-  if(TextGlowEffectsOnSnakeAndCenterText && TextGlowEffects) setGlow(score,GlowMagnitude,shadowColor);
+  if(Graphics.TextGlowEffects && Graphics.TextGlowEffectsOnSnakeAndCenterText)
+    setGlow(score,GlowMagnitude,shadowColor);
   score.style.height=(sizeMultiplier*length)+"px";
   score.style.fontSize=(sizeMultiplier*length)+"px";
   score.innerHTML = text;
   canvas.appendChild(score);
-  if(MovingObjects) timeout[0] = textMove(score,delay + 1000,position[0]+(length-score.offsetWidth)/2,position[1] < (TextGlowEffects?GlowMagnitude/2:0)?(TextGlowEffects?GlowMagnitude/2:0):position[1],position[0]+(length-score.offsetWidth)/2,position[1] + (TextGlowEffects?GlowMagnitude/2:0) + 2*(position[1] + (TextGlowEffects?GlowMagnitude/2:0) + 2*(-sizeMultiplier*length)<=0?sizeMultiplier*length:-sizeMultiplier*length),TextGlowEffects?GlowMagnitude:false,true);
+  if(Graphics.MovingObjects === true)
+    timeout[0] = textMove(
+      score,
+      delay + 1000,
+      position[0] + (length - score.offsetWidth) / 2,
+      position[1] < (Graphics.TextGlowEffects === true?GlowMagnitude/2:0)?(Graphics.TextGlowEffects === true?GlowMagnitude/2:0):position[1],
+      position[0] + (length - score.offsetWidth) / 2,
+      position[1] + (Graphics.TextGlowEffects === true?GlowMagnitude/2:0) + 2*(position[1] + (Graphics.TextGlowEffects === true?GlowMagnitude/2:0) + 2*(-sizeMultiplier*length)<=0?sizeMultiplier*length:-sizeMultiplier*length),
+      Graphics.TextGlowEffects === true?GlowMagnitude:false,
+      true
+    );
   else {
-    score.style.left = position[0]+(length-score.offsetWidth)/2;
-    score.style.top = position[1] + (TextGlowEffects?GlowMagnitude/2:0) + 0.75*(position[1] + (TextGlowEffects?GlowMagnitude/2:0) + 0.75*(-sizeMultiplier*length)<=0?sizeMultiplier*2*length:-sizeMultiplier*length)
+    score.style.left = (position[0] + score.offsetWidth + (Graphics.TextGlowEffects === true?GlowMagnitude/2:0) > Screen.clientDimensions[0]?
+                          Screen.clientDimensions[0] - score.offsetWidth - (Graphics.TextGlowEffects === true?GlowMagnitude/2:0):
+                       (position[0] + (length - score.offsetWidth) / 2 < (Graphics.TextGlowEffects === true?GlowMagnitude/2:0)?
+                         (Graphics.TextGlowEffects === true?GlowMagnitude/2:0):
+                          position[0] + (length - score.offsetWidth) / 2)) + "px";
+    score.style.top = (position[1] + (Graphics.TextGlowEffects === true?GlowMagnitude/2:0) + 0.75 *
+      (position[1] + (Graphics.TextGlowEffects === true?GlowMagnitude/2:0) + 0.75*(-sizeMultiplier*length)<=0?
+         2 * length:
+        -sizeMultiplier * length)) + "px";
   }
-  if(TransparencyOnSnakeText) {
-    setTimeout(function(){timeout[1] = retransparent(score, 1000, 100, 0)},delay);
+  if(Graphics.Transparency === true && Graphics.TransparencyOnSnakeText === true) {
+    setTimeout(function(){timeout[1] = retransparent(score, 1000, 100, 0)}, delay);
   } else {
     setTimeout(function(){hide(score);},delay + 1000);
   }
   setTimeout(function(){if(timeout[0])timeout[0]();if(timeout[1])timeout[1]();hide(score);canvas.removeChild(score);},delay + 1000);
-}
+};
 
-function centerDraw(delay,textColor,shadowColor,size,text) {
-  if(delay <= 0) delay = 1;
-  var timeout = [];
-  var score = document.createElement("div");
-  score.className = "absolutePositionedText centerDraw";
-  score.style.color = textColor;
-  if(TextGlowEffectsOnSnakeAndCenterText && TextGlowEffects) setGlow(score,GlowMagnitude,shadowColor);
-  score.style.fontSize=size+"px";
-  score.innerHTML = text;
-  canvas.appendChild(score);
-  if(MovingObjects) timeout[0] = textMove(score,delay + 1000,Screen.clientDimensions[0] / 2 - score.offsetWidth / 2,Screen.clientDimensions[1] / 2 - size / 2,Screen.clientDimensions[0] / 2 - score.offsetWidth / 2,Screen.clientDimensions[1] / 2 - size * 2,TextGlowEffects?GlowMagnitude:false,true);
-  else {
-    score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2) + "px";
-    score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2) + "px";
-  }
-  if(Transparency) {
-    setTimeout(function(){timeout[1] = retransparent(score, 1000, 100, 0)},delay);
-  } else {
-    setTimeout(function(){hide(score);},delay + 1000);
-  }
-  setTimeout(function(){if(timeout[0])timeout[0]();if(timeout[1])timeout[1]();hide(score);canvas.removeChild(score);},delay + 1000);
-}
-
-function centerGrowDraw(flightDelay,delay,textColor,finalTextColor,shadowColor,finalShadowColor,size,finalSize,text,inner) {
-  if(centerGlowDrawEngaged && !inner) {
-    centerGrowDrawQueue.push([flightDelay,delay,textColor,finalTextColor,shadowColor,finalShadowColor,size,finalSize,text,true]);
+function centerGrowDraw(flightDelay,delay,colorArray,size,finalSize,text,inner) {
+  var textColor = colorArray[0],
+      finalTextColor = colorArray[1],
+      shadowColor = colorArray[2],
+      finalShadowColor = colorArray[3];
+  if(centerGlowDisabled.disabled && !inner) {   // If it's disabled, we add the new stuff into the disabled queue
+    centerGlowDisabled.queue.push([flightDelay,delay,colorArray,size,finalSize,text,true]);
     return;
   }
-  centerGlowDrawEngaged = true;
+  if(centerGlowEngaged && !inner) {    // If it's engaged, we add the new stuff into the regular queue
+    centerGrowDrawQueue.push([flightDelay,delay,colorArray,size,finalSize,text,true]);
+    return;
+  }
+  centerGlowEngaged = true;
+  size = size * drawTextMultiplier;
+  finalSize = finalSize * drawTextMultiplier;
   if(delay <= 0) delay = 1;
   var score = document.createElement("div");
   score.className = "absolutePositionedText glowText";
-  score.style.color = textColor;
-  if(TextGlowEffects) setGlow(score,GlowMagnitude,shadowColor);
-  score.style.fontSize=(ResizingTexts?size:finalSize)+"px";
+  score.style.color = Graphics.ChangingColor === true?textColor:finalTextColor;
+  score.style.fontSize=(Graphics.ResizingTexts === true?size:finalSize)+"px";
   score.innerHTML = text;
-  if(Transparency) setOpacity(score, 0);
+  if(Graphics.Transparency === true)
+    setOpacity(score, 0);
+  if(Graphics.TextGlowEffects === true)
+    setGlow(score,GlowMagnitude,Graphics.ChangingColor === true?shadowColor:finalShadowColor);
   canvas.appendChild(score);
-  if(Transparency) retransparent(score,flightDelay/2,0,100);
-  if(RotatingObjects) rotate(score,flightDelay,0,360,function(){
-    score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2)+"px";
-    score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2)+"px";
-  });
-  if(ResizingTexts) textResize(score,flightDelay,size,finalSize,function() {
-    score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2)+"px";
-    score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2)+"px";
-  },function(){
-    score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2)+"px";
-    score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2)+"px";
-    var sizeInterval = ResizingTexts&&Transparency&&GlowTextHidingAndEnlarging?window.setTimeout(
-      function() {
-        sizeInterval = textResize(score,GlowTextHidingDelay,finalSize,(((Math.min(Screen.clientDimensions[0]/score.offsetWidth,Screen.clientDimensions[1]/score.offsetHeight)-1)*0.7)+1)>=2?2*finalSize:(((Math.min(Screen.clientDimensions[0]/score.offsetWidth,Screen.clientDimensions[1]/score.offsetHeight)-1)*0.7)+1)*finalSize,function() {
-          score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2)+"px";
-          score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2)+"px";
-        });
-      },delay
-    ):false;
-    var colorInterval = ChangingColor?[
-      finalTextColor!=textColor?recolor(delay,textColor,finalTextColor,function(color){
-        score.style.color = color;
-      }, function(){
-        colorInterval[0] = false;
-      }):false,
-      finalShadowColor!=shadowColor && TextGlowEffects?recolor(delay,shadowColor,finalShadowColor,function(color){
-        setGlow(score,GlowMagnitude,color);
-      }, function(){
-        colorInterval[1] = false;
-      }):false
-    ]:[false,false];
-    if(Transparency) {
-      setTimeout(function(){
-        retransparent(score, GlowTextHidingDelay, 100, 0,function(){
+  if(Graphics.Transparency === true)
+    retransparent(score,flightDelay/2,0,100);
+  if(Graphics.ResizingTexts === true) {
+    if(Graphics.RotatingObjects === true)
+      rotate(score, flightDelay, 0, 360);
+    textResize(score,flightDelay,size,finalSize,function() {
+      score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2)+"px";
+      score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2)+"px";
+    }, function() {
+      score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2)+"px";
+      score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2)+"px";
+      var sizeInterval = Graphics.ResizingTexts === true && Graphics.Transparency === true && Graphics.GlowTextHidingAndEnlarging === true?window.setTimeout(
+        function() {
+          sizeInterval = textResize(
+            score,
+            GlowTextHidingDelay,
+            finalSize,
+            (((Math.min(Screen.clientDimensions[0]/score.offsetWidth,Screen.clientDimensions[1]/score.offsetHeight)-1)*0.7)+1)>=2?2*finalSize:(((Math.min(Screen.clientDimensions[0]/score.offsetWidth,Screen.clientDimensions[1]/score.offsetHeight)-1)*0.7)+1)*finalSize,
+            function() {
+              score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2)+"px";
+              score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2)+"px";
+            }
+          );
+        },delay
+      ):false;
+      var colorInterval = Graphics.ChangingColor === true?[
+        finalTextColor!=textColor?recolor(delay,textColor,finalTextColor,function(color){
+          score.style.color = color;
+        }, function(){
+          colorInterval[0] = false;
+        }):false,
+        finalShadowColor!=shadowColor && Graphics.TextGlowEffects === true?recolor(delay,shadowColor,finalShadowColor,function(color){
+          setGlow(score,GlowMagnitude,color);
+        }, function(){
+          colorInterval[1] = false;
+        }):false
+      ]:[false,false];
+      if(Graphics.Transparency === true) {
+        setTimeout(function(){
+          retransparent(score, GlowTextHidingDelay, 100, 0,function(){
+            if(sizeInterval) {
+              if(sizeInterval instanceof Function) sizeInterval();
+              else window.clearTimeout(sizeInterval);
+            }
+            if(colorInterval[0]) colorInterval[0]();
+            if(colorInterval[1]) colorInterval[1]();
+            hide(score);
+            canvas.removeChild(score);
+            if(centerGrowDrawQueue.length > 0) {
+              centerGrowDraw.apply(this, centerGrowDrawQueue[0]);
+              centerGrowDrawQueue.shift();
+            } else {
+              if(centerGrowDrawQueue.callback instanceof Function) {
+                centerGrowDrawQueue.callback();
+                centerGrowDrawQueue.callback = null;
+              }
+              centerGlowEngaged = false;
+            }
+          });
+        }, delay);
+      } else {
+        setTimeout(function(){
+          hide(score);
           if(sizeInterval) {
-            if(typeof sizeInterval === "function") sizeInterval();
+            if(sizeInterval instanceof Function) sizeInterval();
             else window.clearTimeout(sizeInterval);
           }
           if(colorInterval[0]) colorInterval[0]();
@@ -1042,49 +1390,34 @@ function centerGrowDraw(flightDelay,delay,textColor,finalTextColor,shadowColor,f
           canvas.removeChild(score);
           if(centerGrowDrawQueue.length > 0) {
             centerGrowDraw.apply(this,centerGrowDrawQueue[0]);
-            centerGrowDrawQueue = centerGrowDrawQueue.slice(1);
+            centerGrowDrawQueue.shift();
           } else {
-            centerGlowDrawEngaged = false;
+            if(centerGrowDrawQueue.callback instanceof Function) {
+              centerGrowDrawQueue.callback();
+              centerGrowDrawQueue.callback = null;
+            }
+            centerGlowEngaged = false;
           }
-        })
-      },delay);
-    } else {
-      setTimeout(function(){
-        hide(score);
-        if(sizeInterval) {
-          if(typeof sizeInterval === "function") sizeInterval();
-          else window.clearTimeout(sizeInterval);
-        }
-        if(colorInterval[0]) colorInterval[0]();
-        if(colorInterval[1]) colorInterval[1]();
-        hide(score);
-        canvas.removeChild(score);
-        if(centerGrowDrawQueue.length > 0) {
-          centerGrowDraw.apply(this,centerGrowDrawQueue[0]);
-          centerGrowDrawQueue = centerGrowDrawQueue.slice(1);
-        } else {
-          centerGlowDrawEngaged = false;
-        }
-      },delay + GlowTextHidingDelay);
-    }
-  });
-  else {
+        }, delay + GlowTextHidingDelay);
+      }
+    });
+  } else {
     score.style.left = String(Screen.clientDimensions[0] / 2 - score.offsetWidth / 2)+"px";
     score.style.top = String(Screen.clientDimensions[1] / 2 - score.offsetHeight / 2)+"px";
-    var colorInterval = ChangingColor?[
+    var colorInterval = Graphics.ChangingColor === true?[
       finalTextColor!=textColor?recolor(delay,textColor,finalTextColor,function(color){
         score.style.color = color;
-      }, function(){
+      }, function() {
         colorInterval[0] = false;
       }):false,
-      finalShadowColor!=shadowColor && TextGlowEffects?recolor(delay,shadowColor,finalShadowColor,function(color){
+      finalShadowColor!=shadowColor && Graphics.TextGlowEffects === true?recolor(delay,shadowColor,finalShadowColor,function(color){
         setGlow(score,GlowMagnitude,color);
-      }, function(){
+      }, function() {
         colorInterval[1] = false;
       }):false
     ]:[false,false];
-    if(Transparency) {
-      setTimeout(function(){
+    if(Graphics.Transparency === true) {
+      setTimeout(function() {
         retransparent(score, 1000, 100, 0,function(){
           if(colorInterval[0]) colorInterval[0]();
           if(colorInterval[1]) colorInterval[1]();
@@ -1092,9 +1425,13 @@ function centerGrowDraw(flightDelay,delay,textColor,finalTextColor,shadowColor,f
           canvas.removeChild(score);
           if(centerGrowDrawQueue.length > 0) {
             centerGrowDraw.apply(this,centerGrowDrawQueue[0]);
-            centerGrowDrawQueue = centerGrowDrawQueue.slice(1);
+            centerGrowDrawQueue.shift();
           } else {
-            centerGlowDrawEngaged = false;
+            if(centerGrowDrawQueue.callback instanceof Function) {
+              centerGrowDrawQueue.callback();
+              centerGrowDrawQueue.callback = null;
+            }
+            centerGlowEngaged = false;
           }
         })
       },delay);
@@ -1107,48 +1444,45 @@ function centerGrowDraw(flightDelay,delay,textColor,finalTextColor,shadowColor,f
         canvas.removeChild(score);
         if(centerGrowDrawQueue.length > 0) {
           centerGrowDraw.apply(this,centerGrowDrawQueue[0]);
-          centerGrowDrawQueue = centerGrowDrawQueue.slice(1);
+          centerGrowDrawQueue.shift();
         } else {
-          centerGlowDrawEngaged = false;
+          if(centerGrowDrawQueue.callback instanceof Function) {
+            centerGrowDrawQueue.callback();
+            centerGrowDrawQueue.callback = null;
+          }
+          centerGlowEngaged = false;
         }
       },delay + GlowTextHidingDelay);
     }
   }
-}
+};
 
 function spawn(what) {
   if(field.isFull) return false;
-  var funkce;
+  var funkce, oldMissPenalization;
   switch(what) {
     case superFood:
     case bonusFood: {
-      if(bonusFoodSpawned && typeof bonusFoodSpawned.anim === "function") {
+      if(bonusFoodSpawned && bonusFoodSpawned.anim instanceof Function) {
         bonusFoodSpawned.anim();
         bonusFoodSpawned.anim = false;
       }
       AchievementBonusFoodFading = false;
-      var position = pickOne(field.getFree()),
-          interval = currInterval,
-          calcLifetime = function() {
-            return Math.round(7 + calcDistance(Ego.position, position, !!Ego.collision.walls) * (Ego.collision.walls?1:1.5));
-          },
-          lifetime = calcLifetime(),
-          fadeInterval = interval * 5 <= lifetime * currInterval?interval * 5:lifetime * currInterval,
-          // You get 1,5ice (once if walls off) the min. required time to get to the bonus food + two turns to be able to turn around
-          // + 5 turns for the fadein.
-          // ----------------------------------------------
-          // Needs further reworking - a path-finding system!
-          pointer = field.getElement(position[0],position[1]);
+      var position = Ego.find().random();
+      if(!position) return;
+      var lifetime = position[2] * bonusFoodTolerance[3](),
+          fadeInterval = (5 <= lifetime?5:lifetime) * currInterval,
+          pointer = field.getElement(position[0], position[1]),
+          missPenalization = false, reactionTimeout;
+      // For testing purposes only
+      // console.log("Current bonusFood spawn length tolerance: " + bonusFoodTolerance[3]());
       bonusFoodSpawned = field.getObject(position[0],position[1]);
-      bonusFoodSpawned.lifetime = Infinity; // Reakèní timeout, tahy se spoèítají a zaènou odpoèítávat až po daném poètu milisekund (~200 ms)
-      var reactionTimeout = setTimeout(function() {
-        reactionTimeout = false;
-        bonusFoodSpawned.lifetime = lifetime;
-      }, reactionTime);
-      if(ChangingColor) {
-        pointer.style.backgroundColor = foodColors[2];
-        field.spawn(position[0],position[1],what);
-        funkce = recolor(fadeInterval,foodColors[2],foodColors[what === superFood?0:1],function(color) {
+      bonusFoodSpawned.position = position;
+      bonusFoodSpawned.time = Date.now();
+      bonusFoodSpawned.lifetime = Infinity;
+      if(Graphics.ChangingColor === true) {
+        pointer.style.backgroundColor = originalCellColor;
+        funkce = recolor(fadeInterval,originalCellColor,foodColors[foodColorIndexes[what]],function(color) {
           pointer.style.backgroundColor = color;
         }, function(){
           bonusFoodSpawned.anim = false;
@@ -1158,14 +1492,16 @@ function spawn(what) {
           funkce();
           pointer.style.backgroundColor = "";
         }
-      } else if(Transparency) {
-        cover(pointer);
-        field.spawn(position[0],position[1],what);
-        bonusFoodSpawned.anim = retransparent(pointer,fadeInterval,0,100,function(){
-          bonusFoodSpawned.anim = false;
-        });
       }
-      // The warp effect is achieved using either transparency, or color changing
+      field.spawn(position[0],position[1],what);
+      Snake.cleanCache();     // Provedeme výmaz pathFinding cache, jelikož ve stejném kole pozmìòujeme obsah herního pole
+      reactionTimeout = setTimeout(function() { // Reakèní timeout, tahy se spoèítají a zaènou odpoèítávat až po daném poètu milisekund
+        reactionTimeout = false;
+        movesCounter = 0;
+        bonusFoodSpawned.lifetime =
+          (missPenalization = Ego.find(bonusFoodSpawned.position).length * bonusFoodTolerance[3]()) || lifetime;
+      }, reactionTime);
+      // The warp effect is achieved using color changing
       bonusFoodSpawned.extra = what === superFood;
       bonusFoodSpawned.remove = function() {
         movesCounter = 0;
@@ -1173,42 +1509,35 @@ function spawn(what) {
           clearTimeout(reactionTimeout);
           reactionTimeout = false;
         }
-        if(typeof this.anim === "function") {
+        if(this.anim instanceof Function) {
           this.anim();
           this.anim = false;
         }
         field.clearObject(position[0],position[1]);
         bonusFoodSpawned = null;
-        if(bonusFoodHelper > 0) {
-          if(bonusFoodHelper <= bonusFoodHelperStepBackwards) bonusFoodHelper = 0;
-          else bonusFoodHelper -= bonusFoodHelperStepBackwards;
-        }
-        field.clearObject(position[0],position[1]);
       }
       bonusFoodSpawned.despawn = function() {
         AchievementBonusFoodFading = true;
-        var startTransparency = this.anim?getOpacity(pointer):100,
-            time = this.anim?startTransparency/100*(fadeInterval):fadeInterval,
-            despawn = function() {
+        var despawn = function() {
               bonusFoodSpawned.anim = false;
               AchievementBonusFoodFading = false;
               field.remove(position[0],position[1]);
               field.clearObject(position[0],position[1]);
-              AchievementsListener.check("missBonusFood");
-              if(bonusFoodHelper <= 10 - bonusFoodHelperStep * (what === superFood?2:1)) bonusFoodHelper += (bonusFoodHelperStep * (what === superFood?2:1));
-              else if(bonusFoodHelper < 10) bonusFoodHelper = 10;
+              if(missPenalization) {
+                AchievementsListener.check("missBonusFood");
+                ScalingSystem.set(HELP);
+              }
               bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + 1);
-              setOpacity(pointer, 100);
               bonusFoodSpawned = null;
               movesCounter = 0;
               field.clearObject(position[0],position[1]);
             };
-        if(typeof this.anim === "function") {
+        if(this.anim instanceof Function) {
           this.anim();
           this.anim = false;
         }
-        if(ChangingColor) {
-          funkce = recolor(fadeInterval,foodColors[1],foodColors[2],function(color) {
+        if(Graphics.ChangingColor === true) {
+          funkce = recolor(fadeInterval,foodColors[foodColorIndexes[bonusFood]],originalCellColor,function(color) {
             pointer.style.backgroundColor = color;
           }, function(){
             bonusFoodSpawned.anim = false;
@@ -1220,26 +1549,8 @@ function spawn(what) {
             pointer.style.backgroundColor = "";
             field.clearObject(position[0],position[1]);
           }
-        } else if(Transparency) {
-          funkce = retransparent(pointer,fadeInterval,100,0,function(){
-            despawn();
-          });
-          this.anim = function() {
-            funkce();
-            field.clearObject(position[0],position[1]);
-          }
         } else {
-          var timeout = setTimeout(function(){
-            AchievementBonusFoodFading = false;
-            bonusFoodSpawned.anim = false;
-            movesCounter = 0;
-            field.remove(position[0],position[1]);
-            field.clearObject(position[0],position[1]);
-            AchievementsListener.check("missBonusFood");
-            if(bonusFoodHelper <= 10 - bonusFoodHelperStep * (what === superFood?2:1)) bonusFoodHelper += (bonusFoodHelperStep * (what === superFood?2:1));
-            else if(bonusFoodHelper < 10) bonusFoodHelper = 10;
-            bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + 1);
-          }, fadeInterval);
+          var timeout = setTimeout(despawn, fadeInterval);
           this.anim = function() {
             window.clearTimeout(timeout);
             field.clearObject(position[0],position[1]);
@@ -1248,78 +1559,148 @@ function spawn(what) {
       }
       if(what === superFood)
         bonusFoodSpawned.warp = function() {
+          var warp = function() {
+            oldMissPenalization = missPenalization;
+            field.spawn(position[0],position[1],bonusFood);
+            pointer.style.backgroundColor = "";
+            AchievementBonusFoodFading = false;
+            movesCounter = 0;
+            bonusFoodSpawned.extra = false;
+            bonusFoodSpawned.anim = false;
+            if(oldMissPenalization) {
+              AchievementsListener.check("missSuperFood");
+              ScalingSystem.set(HELP);
+            }
+            bonusFoodSpawned.lifetime = (missPenalization = Ego.find(bonusFoodSpawned.position).length * bonusFoodTolerance[3]()) || bonusFoodSpawned.lifetime;
+            bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + 1);
+          }
           AchievementBonusFoodFading = true;
-          if(typeof this.anim === "function") {
+          if(this.anim instanceof Function) {
             this.anim();
             this.anim = false;
           }
-          if(Transparency) setOpacity(pointer, 100);
-          if(ChangingColor) {
-            funkce = recolor(fadeInterval,foodColors[0],foodColors[1],function(color) {
+          if(Graphics.ChangingColor === true) {
+            funkce = recolor(fadeInterval,foodColors[foodColorIndexes[superFood]],foodColors[foodColorIndexes[bonusFood]],function(color) {
               pointer.style.backgroundColor = color;
-            }, function() {
-              field.spawn(position[0],position[1],bonusFood);
-              pointer.style.backgroundColor = "";
-              AchievementBonusFoodFading = false;
-              movesCounter = 0;
-              bonusFoodSpawned.extra = false;
-              bonusFoodSpawned.anim = false;
-              bonusFoodSpawned.lifetime = calcLifetime();
-              AchievementsListener.check("missSuperFood");
-              bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + 1);
-            });
+            }, warp);
             this.anim = function() {
               funkce();
+              AchievementBonusFoodFading = false;
               pointer.style.backgroundColor = "";
             }
           }
           else {
-            var timeout = setTimeout(function(){
-              field.spawn(position[0],position[1],bonusFood);
-              pointer.style.backgroundColor = "";
-              AchievementBonusFoodFading = false;
-              movesCounter = 0;
-              bonusFoodSpawned.extra = false;
-              bonusFoodSpawned.anim = false;
-              bonusFoodSpawned.lifetime = calcLifetime();
-              AchievementsListener.check("missSuperFood");
-              bonusFoodSpawnMoves = calcBonusFoodSpawn(Ego.length + 1);
-            }, fadeInterval);
+            var timeout = setTimeout(warp, fadeInterval);
             this.anim = function() {
               window.clearTimeout(timeout);
+              AchievementBonusFoodFading = false;
               bonusFoodSpawned.anim = false;
             }
           }
         }
       break;
     }
+    case food:
+      // For testing purpose only
+      // console.log("Legendary Food Spawn Chance: " + (legendFoodChance[2]()) * 100 + "%");
+      if(toss(legendFoodChance[2]())) {
+        what = legendFood;
+        var OldRegularFoodSpawned = regularFoodSpawned,
+            index = 0;
+            warp = function() {
+              if(++index >= regularFoodSpawned.lifetime) {
+                field.movement.removeCallback(warp);
+                regularFoodSpawned.warp();
+              }
+            };
+        position = Ego.find().random();
+        if(!position) return;
+        fadeInterval = 5 * currInterval;
+        regularFoodSpawned.position[0] = position[0];
+        regularFoodSpawned.position[1] = position[1];
+        pointer = field.getElement(position[0],position[1]);
+        regularFoodSpawned = field.getObject(position[0],position[1]);
+        regularFoodSpawned.position = position;
+        regularFoodSpawned.lifetime = position[2] * bonusFoodTolerance[3]();
+        regularFoodSpawned.legendary = true;
+        regularFoodSpawned.remove = function() {
+          field.movement.removeCallback(warp);
+          if(reactionTimeout) {
+            clearTimeout(reactionTimeout);
+            reactionTimeout = false;
+          }
+          if(this.anim instanceof Function) {
+            this.anim();
+            this.anim = false;
+          }
+          field.clearObject(position[0],position[1]);
+          regularFoodSpawned = OldRegularFoodSpawned;
+        };
+        regularFoodSpawned.warp = function() {
+          var warp = function() {
+            field.spawn(position[0], position[1], food);
+            pointer.style.backgroundColor = "";
+            AchievementLegendFoodFading = false;
+            field.clearObject(position[0],position[1]);
+            regularFoodSpawned = OldRegularFoodSpawned;
+          };
+          AchievementLegendFoodFading = true;
+          if(Graphics.ChangingColor === true) {
+            funkce = recolor(fadeInterval,foodColors[foodColorIndexes[legendFood]],foodColors[foodColorIndexes[food]],function(color) {
+              pointer.style.backgroundColor = color;
+            }, warp);
+            this.anim = function() {
+              funkce();
+              AchievementLegendFoodFading = false;
+              pointer.style.backgroundColor = "";
+            }
+          }
+          else {
+            var timeout = setTimeout(warp, fadeInterval);
+            this.anim = function() {
+              window.clearTimeout(timeout);
+              AchievementLegendFoodFading = false;
+              bonusFoodSpawned.anim = false;
+            }
+          }
+        };
+        field.spawn(position[0], position[1], what);
+        Snake.cleanCache();     // Provedeme výmaz pathFinding cache, jelikož ve stejném kole pozmìòujeme obsah herního pole
+        reactionTimeout = setTimeout(function() { // Reakèní timeout, tahy se spoèítají a zaènou odpoèítávat až po daném poètu milisekund
+          reactionTimeout = false;
+          regularFoodSpawned.lifetime =
+            Ego.find(regularFoodSpawned.position).length * bonusFoodTolerance[3]() || regularFoodSpawned.lifetime;
+          field.movement.addCallback(warp);
+        }, reactionTime);
+      } else {
+        position = field.getFree().random();
+        regularFoodSpawned.position[0] = position[0];
+        regularFoodSpawned.position[1] = position[1];
+        field.spawn(position[0],position[1],what);
+      }
+      break;
     default: {
-      position = pickOne(field.getFree());
+      position = field.getFree().random();
       field.spawn(position[0],position[1],what);
     }
   }
+};
+
+function toss(odds) {
+  return Math.random() <= odds;
 }
 
-function newThread(funct) {
-  setTimeout(funct);
-}
+function newThread(f) {
+  setTimeout(f, 1);
+};
 
-function getScrollBarWidth() {
-  document.body.style.overflow = 'hidden';
-  var width = document.body.clientWidth;
-  document.body.style.overflow = 'scroll';
-  width -= document.body.clientWidth;
-  if(!width) width = document.body.offsetWidth - document.body.clientWidth;
-  document.body.style.overflow = '';
-  return width;
-}
-
-function pickOne(array) {
-  return array[Math.ceil(Math.random() * array.length)-1];
-}
-
-function findPos(obj) {
-  var curleft = [0,0];
+function getPos(obj) {
+  var curleft = "getBoundingClientRect" in obj?obj.getBoundingClientRect():[0,0];
+  if("getBoundingClientRect" in obj)
+    return [
+      curleft.left - (Html.clientLeft || Body.clientLeft || 0),
+      curleft.top - (Html.clientTop || Body.clientTop || 0)
+    ];
   if(obj.offsetParent)
     while(obj.offsetParent) {
       curleft[0] += obj.offsetLeft;
@@ -1333,8 +1714,28 @@ function findPos(obj) {
       curleft[1] += obj.y;
   }
   return curleft;
-}
+};
 
+/*var isEventSupported = (function(){
+  var TAGNAMES = {
+    'select':'input','change':'input',
+    'submit':'form','reset':'form',
+    'error':'img','load':'img','abort':'img'
+  }
+  function isEventSupported(eventName) {
+    var el = document.createElement(TAGNAMES[eventName] || 'div');
+    eventName = 'on' + eventName;
+    var isSupported = (eventName in el);
+    if (!isSupported) {
+      el.setAttribute(eventName, 'return;');
+      isSupported = typeof el[eventName] == 'function';
+    }
+    el = null;
+    return isSupported;
+  }
+  return isEventSupported;
+})();
+*/
 /*
  This functions returns an array containing 36 points to draw an
  ellipse.
@@ -1367,4 +1768,61 @@ function calculateEllipse(round, x, y, a, b, angle, steps) {
   }
 
   return points;
+};
+
+var Cursor = {
+  Hide: function() {
+    Html.className = "noCursor";
+  },
+  Show: function() {
+    Html.className = "";
+  }
+};
+
+var colorTransition = function(oldColor, newColor) {
+  this.input = [oldColor, newColor];
+  this.oldColor = /#(.{2})(.{2})(.{2})/.exec(oldColor).slice(1);
+  this.newColor = /#(.{2})(.{2})(.{2})/.exec(newColor).slice(1);
+  this.oldColor.each(function(item, index) {
+    this[index] = parseInt(item, 16);
+  });
+  this.newColor.each(function(item, index) {
+    this[index] = parseInt(item, 16);
+  });
 }
+
+colorTransition.prototype.calc = function(ratio) {
+  if(ratio === 0 || ratio === 1)
+    return this.input[ratio];
+  var r = ((this.oldColor[0] * 1 / ratio + this.newColor[0] * 1 / (1 - ratio)) / (1 / (1 - ratio) + 1 / ratio)).round().toString(16),
+      g = ((this.oldColor[1] * 1 / ratio + this.newColor[1] * 1 / (1 - ratio)) / (1 / (1 - ratio) + 1 / ratio)).round().toString(16),
+      b = ((this.oldColor[2] * 1 / ratio + this.newColor[2] * 1 / (1 - ratio)) / (1 / (1 - ratio) + 1 / ratio)).round().toString(16);
+  if(r.length === 1) r = "0" + r;
+  if(g.length === 1) g = "0" + g;
+  if(b.length === 1) b = "0" + b;
+  return "#" + r + g + b;
+};
+
+Number.prototype.group = function(comma, decimals) {
+	var delimit = comma == undefined ? "," : comma,
+	    size = decimals == undefined ? 3 : decimals,
+	    temp = "", prefix = "", decimal = "", that = this + "", j = 0;
+
+	if ( this < 0 ) {
+		prefix = "-";
+		that = that.slice(1);
+	}
+
+	if (that.indexOf('.') >= 0) {
+		decimal = that.slice(that.indexOf('.') + 1);
+		that = that.slice(0, that.indexOf('.'));
+	}
+
+	for (var i = that.length - 1; i >= 0; i--) {
+		temp = that.charAt(i) + temp;
+		if (((++j % size) == 0) && (i != 0))
+      temp = delimit + temp;
+	}
+
+	return (prefix + temp);
+};

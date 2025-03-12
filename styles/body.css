@@ -1,10 +1,16 @@
 body {
-  background-color: #FFFFFF;
   overflow: hidden;
+  font-family: "Consolas", sans-serif;
+}
+
+.noCursor {
+  cursor:
+    url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAZdEVYdFNvZnR3YXJlAFBhaW50Lk5FVCB2My41LjbQg61aAAAADUlEQVQYV2P4//8/IwAI/QL/+TZZdwAAAABJRU5ErkJggg=='),
+    url(styles/none.cur),
+    none;
 }
 
 .absolutePositionedText {
-  font-variant: small-caps;
   text-align: center;
   position: absolute;
   left: -500px;
@@ -17,48 +23,35 @@ body {
 
 .score {
   /* doèasné */
-  /* font-family: "Aftershock Debris"; */
 }
 
 .glowText {
-  /* doèasné */
-  /* font-family: Calibri; */
+  font-variant: small-caps;
 }
 
 .centerDraw {
-  /* doèasné */
-  /* font-family: Calibri; */
+  font-variant: small-caps;
+}
+
+.centerDraw {
   z-index: 1;
 }
 
+.veil {
+  position: absolute;
+  top: 0px; left: 0px;
+  width: 100%; height: 100%;
+  z-index: 2;
+}
+
+ .GUI {
+   z-index: 3;
+ }
+
 .gameField {
   table-layout: fixed;
-  position:absolute;
-  top:0px; left:0px;
-  background-color: #EAEAEA;
+  position: absolute;
+  top: 0px; left: 0px;
+  border-spacing: 1px 1px;
   z-index: -2;
-}
-
-.nic {
-  background-color: #FFFFFF;
-}
-
-.hlava {
-  background-color: #000000;
-}
-
-.telo {
-  background-color: #666666;
-}
-
-.jidlo {
-  background-color: #BBBBBB;
-}
-
-.bonusjidlo {
-  background-color: #60A800;
-}
-
-.superjidlo {
-  background-color: #A92FFF;
 }

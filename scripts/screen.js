@@ -5,31 +5,32 @@ Usage:
    Screen.clientDimensions = [viewport Width, viewport Height]
    Screen.contentDimensions = [page Width, page Height]
    Screen.scrolledContent = [scrolled Width, scrolled Height]
+   Screen.loaded = true / false
 
-  Functions:
+  Methods:
    Screen.now - updates the aforementioned attributes.
     Those are normally updated when the window.onresize
-    or window.onscroll event fires, yet by changing the
+    and window.onscroll events fire, yet by changing the
     content dynamically you may face a situation when
     the attributes are off. And as I don't fancy mindless
     updating in fixed intervals, I implemented this function.
     Returns true / false depending on whether or not any
-    of the values was altered.
+    of the values were altered.
 
    Screen.DOMLoaded - by placing it at the end of your (X)HTML file
     you quicken the loading of the library as it won't wait for the
-    page to load, but merely for the DOM structure to load.
+    page, but merely for the DOM structure to load.
 
   Events:
    Screen.onload - fires as soon as the Screen library is loaded
     and ready to use.
 
    Screen.onresize - fires on window.onresize. Unlike
-    with the  aforementioned event, with this event you have
+    with the aforementioned event, with this event you have
     always the certainty that the values of the Screen object
     attributes have already been updated. Returns the former
-    screen size values in an object {clientDimensions: Number,
-    contentDimensions: Number} as the first attribute and
+    screen size values as an object {clientDimensions: Array,
+    contentDimensions: Array} as the first attribute and
     true / false invokedByUser value depending on if the event was
     invoked because of the Screen.now() call as the second attribute.
 
@@ -41,19 +42,19 @@ Usage:
     true / false invokedByUser value depending on if the event was
     invoked because of the Screen.now() call as the second attribute.
 
-  You can attach your functions directly to the attribute or use
-  the addEventListener / attachEvent methods.
+  You can attach your functions directly to the onload attribute or
+  use the addEventListener / attachEvent methods instead.
 
 */
 
 var Screen = (function() {
-  var loaded = false;
-      loadQueue = [],
+  var loadQueue = [],
       resizeQueue = [],
       scrollQueue = [],
       attachListener = window.addEventListener?addEventListener:attachEvent,
+      detachListener = window.removeEventListener?removeEventListener:detachEvent,
       libraryBody = function() {
-        loaded = true;
+        that.loaded = true;
         var body = document.body || document.getElementsByTagName("body")[0],
             html = document.documentElement || document.getElementsByTagName("html")[0],
             getClosest = function(key, valueOne, valueTwo) {
@@ -64,11 +65,11 @@ var Screen = (function() {
               var abs = [Math.abs(key - valueOne), Math.abs(key - valueTwo)];
               return abs.indexOf(Math.max.apply(Math, abs));
             },
-            newThread = function(funct) {
-              setTimeout(funct);
+            newThread = function(f) {
+              setTimeout(f, 0);
             },
             baseElements = {
-              viewport: [
+              viewport: "innerWidth" in window && "innerHeight" in window?window:[
                 getClosest(screen.availWidth, html.clientWidth, body.clientWidth)?body:html,
                 getClosest(screen.availHeight, html.clientHeight, body.clientHeight)?body:html
               ],
@@ -78,8 +79,8 @@ var Screen = (function() {
               ]
             };
         Screen.clientDimensions = [
-          baseElements.viewport[0].clientWidth,
-          baseElements.viewport[1].clientHeight
+          baseElements.viewport === window?window.innerWidth:baseElements.viewport[0].clientWidth,
+          baseElements.viewport === window?window.innerHeight:baseElements.viewport[1].clientHeight
         ];
         Screen.contentDimensions = [
           baseElements.content[0].scrollWidth,
@@ -94,31 +95,31 @@ var Screen = (function() {
             clientDimensions : Screen.clientDimensions.slice(0),
             contentDimensions : Screen.contentDimensions.slice(0)
           }, formerScrolledContent = Screen.scrolledContent.slice(0);
-          if(Screen.clientDimensions[0] !=
-            (Screen.clientDimensions[0] = baseElements.viewport[0].clientWidth))
+          if(Screen.clientDimensions[0] !==
+            (Screen.clientDimensions[0] = baseElements.viewport === window?window.innerWidth:baseElements.viewport[0].clientWidth))
             resized = true;
-          if(Screen.clientDimensions[1] !=
-            (Screen.clientDimensions[1] = baseElements.viewport[1].clientHeight) &&
+          if(Screen.clientDimensions[1] !==
+            (Screen.clientDimensions[1] = baseElements.viewport === window?window.innerHeight:baseElements.viewport[1].clientHeight) &&
             !resized)
             resized = true;
-          if(Screen.contentDimensions[0] !=
+          if(Screen.contentDimensions[0] !==
             (Screen.contentDimensions[0] = baseElements.content[0].scrollWidth) &&
             !resized)
             resized = true;
-          if(Screen.contentDimensions[1] !=
+          if(Screen.contentDimensions[1] !==
             (Screen.contentDimensions[1] = baseElements.content[1].scrollHeight) &&
             !resized)
             resized = true;
-          if(Screen.scrolledContent[0] !=
+          if(Screen.scrolledContent[0] !==
             (Screen.scrolledContent[0] = html.scrollLeft > 0?html.scrollLeft:body.scrollLeft) &&
             !scrolled)
             scrolled = true;
-          if(Screen.scrolledContent[1] !=
+          if(Screen.scrolledContent[1] !==
             (Screen.scrolledContent[1] = html.scrollTop > 0?html.scrollTop:body.scrollTop) &&
             !scrolled)
             scrolled = true;
           if(resized) {
-            if(typeof Screen.onresize == "function") newThread(function(){
+            if(Screen.onresize instanceof Function) newThread(function(){
               Screen.onresize(formerSizeValues, !invokedByUser);
             });
             resizeQueue.each(function(field) {
@@ -128,7 +129,7 @@ var Screen = (function() {
             });
           }
           if(scrolled) {
-            if(typeof Screen.onscroll == "function") newThread(function(){
+            if(Screen.onscroll instanceof Function) newThread(function(){
               Screen.onscroll(formerScrolledContent, !invokedByUser);
             });
             scrollQueue.each(function(field) {
@@ -140,11 +141,11 @@ var Screen = (function() {
           return scrolled || resized;
         }
         attachListener((window.addEventListener?"":"on")+"scroll", function(){
-          if(typeof Screen.onscroll == "function" || scrollQueue.length)
+          if(Screen.onscroll instanceof Function || scrollQueue.length)
             var formerScrolledContent = Screen.scrolledContent.slice(0);
           Screen.scrolledContent[0] = html.scrollLeft > 0?html.scrollLeft:body.scrollLeft;
           Screen.scrolledContent[1] = html.scrollTop > 0?html.scrollTop:body.scrollTop;
-          if(typeof Screen.onscroll == "function") newThread(function(){
+          if(Screen.onscroll instanceof Function) newThread(function(){
             Screen.onscroll(formerScrolledContent, false);
           });
           scrollQueue.each(function(field) {
@@ -156,25 +157,26 @@ var Screen = (function() {
         attachListener((window.addEventListener?"":"on")+"resize", function() {
           Screen.now(true);
         }, false);
-        if(typeof Screen.onload == "function") {
+        if(Screen.onload instanceof Function) {
           Screen.onload();
           delete Screen.onload;
         }
         loadQueue.each(function(func) {
           newThread(func);
         });
-      };
+      }, that;
   attachListener((window.addEventListener?"":"on")+"load", libraryBody, false);
-  return {
+  return (that = {
+    loaded: false,
     DOMLoaded : function() {
-      if(!loaded) {
-        remListener("load", libraryBody);
+      if(!that.loaded) {
+        detachListener((window.removeEventListener?"":"on")+"load", libraryBody, false);
         libraryBody();
       }
     },
     addEventListener : function(name, listener) {
       switch(name) {
-        case "load": if(!loaded) loadQueue.push(listener); return !loaded;
+        case "load": if(!that.loaded) loadQueue.push(listener); return !that.loaded;
         case "resize": resizeQueue.push(listener); return true;
         case "scroll": scrollQueue.push(listener); return true;
         default: return false;
@@ -190,7 +192,7 @@ var Screen = (function() {
       success = false;
       if(!array) return false;
       array.each(function(field, index) {
-        if(field == listener) {
+        if(field === listener) {
           array.remove(index);
           success = true;
         }
@@ -199,7 +201,7 @@ var Screen = (function() {
     },
     attachEvent : function(name, listener) {
       switch(name) {
-        case "onload": if(!loaded) loadQueue.push(listener); return !loaded;
+        case "onload": if(!that.loaded) loadQueue.push(listener); return !that.loaded;
         case "onresize": resizeQueue.push(listener); return true;
         case "onscroll": scrollQueue.push(listener); return true;
         default: return false;
@@ -215,12 +217,12 @@ var Screen = (function() {
       success = false;
       if(!array) return false;
       array.each(function(field, index) {
-        if(field == listener) {
+        if(field === listener) {
           array.remove(index);
           success = true;
         }
       });
       return success;
     }
-  };
+  });
 })();

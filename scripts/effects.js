@@ -1,79 +1,70 @@
 var setOpacity, getOpacity, setGlow, setAngle;
 
-if("\v" == "v") {
+if(CSSFilters && !(CSSTransform && CSSOpacity)) {
 
-  setGlow = function(element, glowStrength, glowColor) {
-    if(typeof element != "object" || typeof glowStrength != "number" || glowStrength < 0 || typeof glowColor != "string" || typeof element.style != "object" || element.style.cssText == void(0)) return false;
-    if(/progid:\s*DXImageTransform\.Microsoft\.Glow\(color\s*=\s*#\s*[0-9a-fA-F]*\s*,\s*strength\s*=\s*\d*\s*\)/i.test(element.style.filter)) {
-      if(glowStrength > 0) {
-        element.style.filter = element.style.filter.replace(/(progid:\s*DXImageTransform\.Microsoft\.Glow\(color\s*=\s*)#\s*[0-9a-fA-F]*(\s*,\s*strength\s*=\s*)\d*(\s*\))/i,"$1" + glowColor + "$2" + glowStrength + "$3");
-      } else {
-        element.style.cssText = element.style.cssText.replace(/(filter:\s*)*progid:\s*DXImageTransform\.Microsoft\.Glow\(color\s*=\s*#\s*[0-9a-fA-F]*\s*,\s*strength\s*=\s*\d*\s*\)/ig,"");
-      }
-    } else if(glowStrength > 0) {
-      element.style.filter += "progid:DXImageTransform.Microsoft.Glow(color = " + glowColor + ", strength = " + glowStrength + ")";
+  setGlow = function(element, strength, color) {
+    var filter = element.style.filter.length === 0?
+      false:element.filters["DXImageTransform.Microsoft.Glow"];
+    if(typeof filter === "object")
+      element.style.filter = element.style.filter.replace(
+        /(progid:DXImageTransform\.Microsoft\.Glow\(color=).*(,strength=)\d*(\))/,
+        strength > 0?"$1" + color + "$2" + strength + "$3":""
+      );
+    else if(strength !== 0) {
+      element.style.filter += "progid:DXImageTransform.Microsoft.Glow(color=" + color +
+                                                                    ",strength=" + strength + ")";
     }
-    return true;
-  }
+  };
 
   setAngle = function(element, angle) {
-    if(typeof element != "object" || typeof angle != "number" || angle > 360 || angle < -360 || typeof element.style != "object" || element.style.cssText == void(0)) return false;
-    if(angle == 360 || angle == -360) angle = 0;
-    else if(angle>360) angle -= Math.floor(angle/360)*360;
-    else if(angle<-360) angle += Math.floor(angle/360)*360;
-    if(angle<0) angle = 360+angle;
-    angle = Math.round(angle/90);
-    if(/progid:\s*DXImageTransform\.Microsoft\.BasicImage\(rotation\s*=\s*\d\s*\)/i.test(element.style.filter)) {
-      if(angle > 0) {
-        element.style.filter = element.style.filter.replace(/(progid:\s*DXImageTransform\.Microsoft\.BasicImage\(rotation\s*=\s*)\d(\s*\))/i,"$1" + angle + "$2");
-      } else {
-        element.style.cssText = element.style.cssText.replace(/(filter:\s*)*progid:\s*DXImageTransform\.Microsoft\.BasicImage\(rotation\s*=\s*\d\s*\)/ig,"");
-      }
-    } else if(angle > 0) {
-      element.style.filter += "progid:DXImageTransform.Microsoft.BasicImage(rotation = " + angle + ")";
+    var sin, cos,
+        filter = element.style.filter.length === 0?
+          false:element.filters["DXImageTransform.Microsoft.Matrix"];
+    angle = angle.degToRad().radAdjust();
+    sin = angle.sin();
+    cos = angle.cos();
+    if(typeof filter === "object") {
+      /* Spoèítáme si hodnoty transformace a zaneseme nové hodnoty */
+      element.style.filter = element.style.filter.replace(
+        /(progid:DXImageTransform\.Microsoft\.Matrix\(M11=)-?.*(,M12=)-?.*(,M21=)-?.*(,M22=)-?.*(,sizingMethod='auto expand'\))/,
+        angle !== 0?"$1" + cos + "$2" + (-sin) + "$3" + sin + "$4" + cos + "$5":""
+      );
+    } else if(angle !== 0) {
+      /* Vytvoøíme nový záznam filtru */
+      element.style.filter += "progid:DXImageTransform.Microsoft.Matrix(M11=" +   cos  +
+                                                                      ",M12=" + (-sin) +
+                                                                      ",M21=" +   sin  +
+                                                                      ",M22=" +   cos  +
+                                                                      ",sizingMethod='auto expand')";
     }
-    return true;
-  }
+  };
 
   setOpacity = function(element, opacity) {
-    if(typeof element != "object" || typeof opacity != "number" || opacity < 0 || opacity > 100 || typeof element.style != "object" || element.style.cssText == void(0)) return false;
-    if(/progid:\s*DXImageTransform\.Microsoft\.Alpha\(opacity\s*=\s*\d*\.*\d*\s*\)/i.test(element.style.filter)) {
-      if(opacity > 0) {
-        if(element.style.visibility == "hidden")
-          element.style.visibility = "visible";
-        if(opacity < 100)
-          element.style.filter = element.style.filter.replace(/(progid:\s*DXImageTransform\.Microsoft\.Alpha\(opacity\s*=\s*)\d*\.*\d*(\s*\))/i,"$1" + opacity + "$2");
-        else
-          element.style.cssText = element.style.cssText.replace(/(filter:\s*)*progid:\s*DXImageTransform\.Microsoft\.Alpha\(opacity\s*=\s*\d*\.*\d*\s*\)/ig,"");
-      } else {
-        element.style.visibility = "hidden";
-      }
-    } else {
-      if(opacity > 0) {
-        if(element.style.visibility == "hidden")
-          element.style.visibility = "visible";
-        if(opacity < 100)
-          element.style.filter += "progid:DXImageTransform.Microsoft.Alpha(opacity = " + opacity + ")";
-      }
-      else if(opacity == 0)
-        element.style.visibility = "hidden";
-    }
-    return true;
-  }
+    var filter = element.style.filter.length === 0?
+          false:element.filters["DXImageTransform.Microsoft.Alpha"];
+    opacity = opacity.round();
+    if(opacity > 0 && element.style.visibility == "hidden")
+       element.style.visibility = "visible";
+    if(typeof filter === "object") {
+      element.style.filter = element.style.filter.replace(
+        /(progid:DXImageTransform\.Microsoft\.Alpha\(opacity=)\d*(\.\d*)?(\))/,
+        opacity !== 0 && opacity !== 100?"$1" + opacity + "$3":""
+      );
+    } else if(opacity !== 0 && opacity !== 100)
+      element.style.filter += "progid:DXImageTransform.Microsoft.Alpha(opacity=" + opacity + ")";
+    if(     opacity === 0   && !covered(element))   cover(element);
+    else if(opacity === 100 &&  covered(element)) uncover(element);
+  };
 
   getOpacity = function(element) {
-    if(typeof element != "object" || typeof element.style != "object" || element.style.cssText == void(0)) return 100;
-    return (Number(element.style.cssText.match(/progid:\s*DXImageTransform\.Microsoft\.Alpha\(opacity\s*=\s*(\d*\.*\d*)\s*\)/i)[1]) || (element.style.visibility == "hidden"?0:100))
-  }
+    return (element.filters["DXImageTransform.Microsoft.Alpha"] && element.filters["DXImageTransform.Microsoft.Alpha"].opacity) || (element.style.visibility == "hidden"?0:100);
+  };
 
-} else {
+} else if(CSSTransform && CSSOpacity) {
 
   setAngle = function(element, angle) {
-    if(typeof element != "object" || typeof angle != "number" || typeof element.style != "object") return false;
-    if(angle == 360 || angle == -360) angle = 0;
-    else if(angle>360) angle -= Math.floor(angle/360)*360;
-    else if(angle<-360) angle += Math.floor(angle/360)*360;
-    if(angle<0) angle = 360+angle;
+    if(angle < 0) angle = angle % 360 + 360
+    if(angle >= 360) angle %= 360;
     if(angle != 0) {
       element.style.transform = "rotate(" + angle + "deg)";
       element.style.WebkitTransform = "rotate(" + angle + "deg)";
@@ -85,71 +76,89 @@ if("\v" == "v") {
       element.style.MozTransform = "";
       element.style.OTransform = "";
     }
-    return true;
-  }
+  };
 
-  setGlow = function(element, glowStrength, glowColor) {
-    if(typeof element != "object" || typeof glowStrength != "number" || glowStrength < 0 || typeof glowColor != "string" || typeof element.style != "object") return false;
-    element.style.textShadow = glowColor + " 0px 0px " + glowStrength + "px";
-    return true;
-  }
+  setGlow = function(element, strength, color) {
+    if(strength > 0)
+      element.style.textShadow = color + " 0px 0px " + strength + "px";
+    else element.style.textShadow = "";
+  };
 
   setOpacity = function(element, opacity) {
-    if(typeof element != "object" || typeof opacity != "number" || opacity < 0 || opacity > 100 || typeof element.style != "object") return false;
     if(opacity > 0) {
       if(element.style.visibility == "hidden")
         element.style.visibility = "visible";
-      element.style.opacity = opacity==100?"":opacity / 100;
+      element.style.opacity = opacity === 100?"":opacity / 100;
     } else {
       element.style.visibility = "hidden";
-      if(element.style.opacity) element.style.opacity = "";
+      if(element.style.opacity)
+        element.style.opacity = "";
     }
-    return true;
-  }
+  };
 
   getOpacity = function(element) {
-    if(typeof element != "object" || typeof element.style != "object") return 100;
     if(element.style.visibility == "hidden") return 0;
-    else if(element.style.opacity) return element.style.opacity * 100;
+    else if(element.style.opacity)
+      return element.style.opacity * 100;
     else return 100;
-  }
+  };
 }
 
 var show = function(element) {
-  if(typeof element != "object" || typeof element.style != "object") return false;
   element.style.display = "";
   return true;
-}
+};
 
 var hide = function(element) {
-  if(typeof element != "object" || typeof element.style != "object") return false;
   element.style.display = "none";
   return true;
-}
+};
 
 var cover = function(element) {
-  if(typeof element != "object" || typeof element.style != "object") return false;
   element.style.visibility = "hidden";
   return true;
-}
+};
 
 var uncover = function(element) {
-  if(typeof element != "object" || typeof element.style != "object") return false;
   element.style.visibility = "";
   return true;
-}
+};
 
 var shown = function(element) {
-  if(typeof element != "object" || typeof element.style != "object") return false;
-  return element.style.display != "none" && element.style.visibility != "hidden";
-}
+  return element.style.display !== "none" && element.style.visibility !== "hidden";
+};
 
 var hidden = function(element) {
-  if(typeof element != "object" || typeof element.style != "object") return false;
-  return element.style.display == "none";
-}
+  return element.style.display === "none";
+};
 
 var covered = function(element) {
-  if(typeof element != "object" || typeof element.style != "object") return false;
-  return element.style.visibility == "hidden";
-}
+  return element.style.visibility === "hidden";
+};
+
+/*var Transition = CSSTransition === true?function(element, opts) {
+  var i;
+  if("StartValue" in opts) {
+    if(opts.JSProperties instanceof Array)
+      opts.JSProperties.each(function(property) {
+        element.style[property] = opts.StartValue;
+      });
+    else element.style[opts.JSProperties] = opts.StartValue;
+  }
+  // Property, Duration, TimingFunction, Delay, Value, StartValue, JSProperties
+  for(i in opts) {
+    if(i === "Value" ||
+       i === "StartValue" ||
+       i === "JSProperties")
+         continue;
+    element.style["transition" + i] = opts[i];
+    element.style["OTransition" + i] = opts[i];
+    element.style["MozTransition" + i] = opts[i];
+    element.style["WebkitTransition" + i] = opts[i];
+  }
+  if(opts.JSProperties instanceof Array)
+    opts.JSProperties.each(function(property) {
+      element.style[property] = opts.Value;
+    });
+  else element.style[opts.JSProperties] = opts.Value;
+}:false;*/

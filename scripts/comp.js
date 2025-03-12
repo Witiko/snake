@@ -10,23 +10,49 @@ var remListener = !window.removeEventListener?function(type, listener) {
   window.removeEventListener(type, listener, false);
 };
 
-if(!Array.indexOf)
-  Array.prototype.indexOf = function(o,i){
-    for(var j=this.length,i=i<0?i+j<0?0:i+j:i||0;i<j&&this[i]!==o;i++);return j<=i?-1:i
-  }
-
-if(!Date.now)
+if(!("now" in Date))
   Date.now = function() {
     return new Date().getTime();
-  }
+  };
 
-if(window.NodeList)
-  NodeList.prototype.toArray = function() {
-  	for(var index = 0, length = this.length, array = []; index < length; index++) {
-  		array.push(this[index]);
-  	}
-  	return array;
-  }
+Number.prototype.times = function(f) {
+  var index = this;
+  if(/\./.test(index) || index <= 0) return;
+  while(index-- > 0) f();
+};
+
+// Non-standardized prototype.js inspired methods.
+// They work akin to the bind function, but omit the context-rewriting part.
+
+if(!("attach" in Function.prototype)) // The returned function ignores all passed arguments
+  Function.prototype.attach = function() {
+    var boundFunction = this,
+        boundArguments = Array.prototype.slice.call(
+          arguments, 0
+        );
+    return function() {
+      return boundFunction.apply(
+        this, boundArguments
+      );
+    };
+  };
+
+if(!("curry" in Function.prototype)) // The arguments passed to the returned function
+  Function.prototype.curry = function() { // are concatenated with the bound arguments
+    var boundFunction = this,
+        boundArguments = Array.prototype.slice.call(
+          arguments, 0
+        );
+    return function() {
+      return boundFunction.apply(
+        this, boundArguments.concat(
+          Array.prototype.slice.call(
+            arguments, 0
+          )
+        )
+      );
+    };
+  };
 
 Array.prototype.remove = function(from, to) {
   var rest = this.slice((to || from) + 1 || this.length);
@@ -34,83 +60,186 @@ Array.prototype.remove = function(from, to) {
   return this.push.apply(this, rest);
 };
 
-Array.prototype.each = function(callback) {
-  if(typeof callback !== "function" || this.length === 0) return this;
-  for(var index = 0; index < this.length; index++) {
-    if(callback.call(this, this[index], index) == false) break;
+Array.prototype.removeByValue = function(value) {
+  var index = this.indexOf(value);
+  return index > -1?this.remove(index):this.length;
+};
+
+Array.prototype.removeByLastValue = function(value) {
+  var index = this.lastIndexOf(value);
+  return index > -1?this.remove(index):this.length;
+};
+
+Array.prototype.each = function(callback, from, to) {
+  var length = this.length;
+  if(callback instanceof Function === false ||
+     length === 0) return this;
+
+  if(from === undefined)
+     from  = 0;
+  if(to === undefined)
+     to  = from < 0 && -from < length?0:length - 1;
+
+  if(from < 0)
+    from = -from >= length?0:length + from;
+  else if(from > length - 1)
+    from = length - 1;
+
+  if(to < 0)
+     to = -to >= length?(from > 0?0:length - 1):length + to;
+  else if(to > length - 1)
+    to = length - 1;
+
+  if(from > to) do {
+    if(callback.call(this, this[from], from) === false) return false;
+  } while(from-- !== to) else if(from < to) do {
+    if(callback.call(this, this[from], from) === false) return false;
+  } while(from++ !== to) else if(callback.call(this, this[from], from) === false)
+  return false; return this;
+};
+
+Array.prototype.equals = function(array, maxDepth) {
+    if(maxDepth === 0) return true;
+    var result = true;
+    if ((array instanceof Array)
+     && (array.length === this.length)
+    ) {
+        for (var i = 0, l = this.length; i < l; i++) {
+            if ( (this[i] instanceof Array) && (array[i] instanceof Array) ) {
+                result = Array.prototype.equal.call(this[i], array[i], maxDepth - 1);
+            } else {
+                if (array[i] !== this[i]) {
+                    result = false;
+                    break;
+                }
+            }
+        }
+    } else return false;
+    return result;
+};
+
+if(!(Array.prototype.indexOf instanceof Function))
+  Array.prototype.indexOf = function(needle, from) {
+    if(this === undefined || this === null) throw new TypeError;
+    for(var i = !from || from < 0?0:from,
+            l = this.length; i < l; i++)
+      if(this[i] === needle) return i; return -1;
+  };
+
+Array.prototype.random = function() {
+  var l;
+  return this[
+    (l = this.length) <= 1?
+      0:Math.ceil(
+        Math.random() * l
+      ) - 1
+    ];
+};
+
+Array.prototype.pick = function() {
+  var result, random, l;
+  if((l = this.length) === 1) {
+    result = this[0];
+    this.length = 0;
+  } else {
+    random = Math.ceil(
+      Math.random() * l
+    ) - 1;
+    result = this[random];
+    this.remove(random);
   }
-  return this;
-}
+  return result;
+};
 
-/*
+Array.prototype.minArray = function() {
+  var min = this.min(),
+      array = [],
+      index = 0;
+  do {
+    if((index = this.indexOf(min, index)) !== -1)
+      array.push(index);
+  } while(index++ > -1)
+  return array;
+};
 
-A lightweight version
-  - "this" refference not passed
-  - cannot be "break"-ed
-  - array length changes during runtime not expected nor handled
-  ---> Quicker
+Array.prototype.maxArray = function() {
+  var max = this.max(),
+      array = [],
+      index = 0;
+  do {
+    if((index = this.indexOf(max, index)) !== -1)
+      array.push(index);
+  } while(index++ > -1)
+  return array;
+};
 
-Array.prototype.each = function(callback) {
-  var length = this.length, progress = 0;
-  if(typeof callback !== "function" || length === 0) return;
-  do{
-    callback(this[progress]);
-  } while(++progress < length)
-}
-
-*/
-
-if(typeof Element == "object" && "\v" == "v") {
-  (function() {
-    var removeChild = Element.prototype.removeChild;
-    Element.prototype.removeChild = function() {
-      var d = arguments[0], a = d.attributes, i, l, n;
-      if (a) {
-          l = a.length;
-          for (i = 0; i < l; i += 1) {
-              n = a[i].name;
-              if (typeof d[n] === 'function') {
-                  d[n] = null;
-              }
-          }
-      }
-      a = d.childNodes;
-      if (a) {
-          l = a.length;
-          for (i = 0; i < l; i += 1) {
-              purge(d.childNodes[i]);
-          }
+String.prototype.numberOf = function(needle) {
+  var num = 0,
+      lastIndex = 0;
+  if(needle instanceof RegExp) {
+    if(!needle.global) {
+      var flags = "g";
+      if(needle.ignoreCase) flags += "i";
+      if(needle.multiline) flags += "m";
+      needle = new RegExp(needle.source, flags);
     }
-      removeChild.apply(this, arguments);
+    return (num = this.match(needle)) !== null?num.length:0;
+  } else {
+    if(typeof needle !== "string" && !(needle instanceof String))
+      needle = needle.toString();
+    while((lastIndex = this.indexOf(needle, lastIndex) + 1) > 0)
+      num++; return num;
+  }
+};
+
+if(!("reverse" in String.prototype))
+  String.prototype.reverse = function() {
+    return this.split("").reverse().join("");
+  };
+
+Array.prototype.copy = function() {
+  return this.slice(0);
+};
+
+Array.prototype.gather = String.prototype.gather = function(needle) {
+  var indexes = [],
+      lastIndex = 0,
+      realIndex = 0,
+      string = this,
+      stringLength = string.length;
+  if(needle instanceof RegExp) {
+    while((realIndex = string.search(needle)) > -1 &&
+          (lastIndex = realIndex + lastIndex) !== stringLength) {
+      indexes.push(lastIndex++);
+      string = string.slice(realIndex + 1);
     }
-  })();
-}
+  } else {
+    while((lastIndex = this.indexOf(needle, lastIndex)) > -1) {
+      indexes.push(lastIndex++);
+    }
+  } return indexes;
+};
 
-Number.prototype.group = function(fontSize, comma, decimals) {
-	var delimit = (comma == undefined) ? "," : comma,
-	    size = (decimals == undefined) ? 3 : decimals,
-	    temp = "", prefix = "", decimal = "", that = this + "", j = 0;
-        fontSize = (fontSize == undefined) ? ["",""] : ["<span style=\"font-size: " + fontSize + "px;\">","</span>"];
+Array.prototype.search = function(needle) {
+  if(!(needle instanceof RegExp)) return this.indexOf(needle);
+  var index = -1;
+  this.each(function(content, i) {
+    if(needle.test(content)) {
+      index = i;
+      return false;
+    }
+  });
+  return index;
+};
 
-	if ( this < 0 ) {
-		prefix = "-";
-		that = that.slice(1);
-	}
+Object.each = function(object, callback) {
+  if(!(object instanceof Object)) return object;
+  for(var i in object) {
+    if(callback.call(object, object[i], i) === false) return false;
+  }
+  return object;
+};
 
-	if (that.indexOf('.') >= 0) {
-		decimal = that.slice(that.indexOf('.') + 1);
-		that = that.slice(0, that.indexOf('.'));
-	}
-
-	for (var i = that.length - 1; i >= 0; i--) {
-		temp = that.charAt(i) + temp;
-		if (((++j % size) == 0) && (i != 0))
-      temp = delimit + fontSize[0] + temp + fontSize[1];
-	}
-
-	return (prefix + temp);
-}
-
-Number.prototype.roundTo = function(num_1) {
-	return (Math.round(this * Math.pow(10, num_1)) / Math.pow(10, num_1));
-}
+Boolean.prototype.bitify = function() {
+  return this.valueOf()?1:0;
+};
