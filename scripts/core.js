@@ -424,7 +424,11 @@ function game(resetField) {
                                     google.loader.ClientLocation.longitude);
      (DayTimeListener.now === DayTime.DAY?Day:Night).Apply();
       DayTimeListener.listen(modeSwitch);
-    } else Day.Apply();
+    } else if(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      Night.Apply();
+    } else {
+      Day.Apply();
+    }
     GUIInit();
   }
 
