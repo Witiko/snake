@@ -465,7 +465,7 @@ function game(resetField) {
                   return this.length === this._.length?this.history[this.history.length - 2]:this.lastCell;
                 }
               ],
-              method: DIRECTIONPICKING
+              method: NONE
             }
           },
           autoSpawn: true,
