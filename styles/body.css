@@ -1,0 +1,68 @@
+body {
+  background-color: #FFFFFF;
+  overflow: hidden;
+}
+
+.absolutePositionedText {
+  font-variant: small-caps;
+  text-align: center;
+  position: absolute;
+  left: -500px;
+  top: -500px;
+}
+
+.snakeDraw {
+  z-index: -1;
+}
+
+.score {
+  /* doèasné */
+  /* font-family: "Aftershock Debris"; */
+}
+
+.glowText {
+  /* doèasné */
+  /* font-family: Calibri; */
+}
+
+.centerDraw {
+  /* doèasné */
+  /* font-family: Calibri; */
+  z-index: 1;
+}
+
+.gameField {
+  table-layout: fixed;
+  position:absolute;
+  top:0px; left:0px;
+  background-color: #EAEAEA;
+  z-index: -2;
+}
+
+td {
+  border-width: 0px;
+}
+
+.nic {
+  background-color: #FFFFFF;
+}
+
+.hlava {
+  background-color: #000000;
+}
+
+.telo {
+  background-color: #666666;
+}
+
+.jidlo {
+  background-color: #BBBBBB;
+}
+
+.bonusjidlo {
+  background-color: #60A800;
+}
+
+.superjidlo {
+  background-color: #A92FFF;
+}
