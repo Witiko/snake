@@ -615,7 +615,7 @@ function game(resetField) {
         showMenu();
       }, {
         enableHighAccuracy: false,
-        timeout: 5000,
+        timeout: Infinity,
         maximumAge: Infinity,
       });
     } else {
